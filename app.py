@@ -32,16 +32,15 @@ st.set_page_config(page_title="Murlyka Lab", page_icon="🐱", layout="wide")
 st.title("🐱 Murlyka Lab")
 
 # ==========================================
-# 🔝 ВЕРХ: КАЛЬКУЛЯТОР БЕЗОПАСНОСТИ (С ДВУМЯ БЕГУНКАМИ!)
+# 🔝 ВЕРХ: КАЛЬКУЛЯТОР БЕЗОПАСНОСТИ
 # ==========================================
 st.header("🧪 Калькулятор Безопасности")
-st.caption("Проверка лимитов IFRA в ГОТОВОМ продукте")
 
 cv1, cv2 = st.columns(2)
 with cv1: calc_conc_drops = st.slider("Капель концентрата", 1, 100, 30, key="ccd")
 with cv2: calc_alc_drops = st.slider("Капель спирта", 0, 200, 30, key="cad")
 calc_total = calc_conc_drops + calc_alc_drops
-st.caption(f"Итого готовый продукт: **{calc_total} капель**")
+st.caption(f"Готовый продукт: **{calc_total} капель**")
 
 cc1, cc2 = st.columns(2)
 with cc1: calc_comp = st.selectbox("Компонент", list(COMPONENTS.keys()), key="ccomp")
@@ -52,9 +51,9 @@ if st.button("Рассчитать!", type="primary", use_container_width=True, 
     cf = calc_conc / 100.0
     e_ifra = 100.0 if d["ifra_limit"] == 100.0 else d["ifra_limit"] / cf
     e_rec = d["rec_dose"] / cf
-    # ✅ Считаем максимум в КОНЦЕНТРАТЕ, но исходя из объёма ГОТОВОГО продукта
-    mx = round(calc_total * e_ifra / 100, 3)
-    rc = round(calc_total * e_rec / 100, 3)
+    # ✅ ЦЕЛЫЕ КАПЛИ (округление вниз для безопасности)
+    mx = int(calc_total * e_ifra / 100)
+    rc = round(calc_total * e_rec / 100, 1)
     st.divider()
     st.subheader(f"📊 {calc_comp}")
     m1, m2 = st.columns(2)
@@ -62,11 +61,10 @@ if st.button("Рассчитать!", type="primary", use_container_width=True, 
     with m2: st.metric("Максимум по IFRA", f"{mx} кап.", f"{e_ifra:.2f}%")
 
 # ==========================================
-# 👇 НИЗ: ЖУРНАЛ ТЕСТОВ (С ДВУМЯ БЕГУНКАМИ!)
+# 👇 НИЗ: ЖУРНАЛ ТЕСТОВ
 # ==========================================
 st.divider()
 st.header("📓 Журнал Тестов")
-st.caption("Сборка формулы + запись % в готовом продукте")
 
 if "formula" not in st.session_state:
     st.session_state.formula = []
@@ -75,34 +73,72 @@ jv1, jv2 = st.columns(2)
 with jv1: j_conc_drops = st.slider("Капель концентрата", 1, 100, 30, key="jcd")
 with jv2: j_alc_drops = st.slider("Капель спирта", 0, 200, 30, key="jad")
 j_total = j_conc_drops + j_alc_drops
-st.caption(f"Итого готовый продукт: **{j_total} капель**")
+st.caption(f"Готовый продукт: **{j_total} капель**")
 
 st.subheader("🧪 Добавить ингредиент")
 a1, a2, a3, a4 = st.columns([2,2,1,1])
 with a1: j_comp = st.selectbox("Компонент", list(COMPONENTS.keys()), key="jcomp")
 with a2: j_concentration = st.selectbox("Концентрация (%)", [100,50,30,20,10,5,2,1], index=0, key="jconc")
-with a3: j_drops = st.number_input("Капель", min_value=0.0, step=0.5, value=1.0, key="jdr")
+# ✅ ТОЛЬКО ЦЕЛЫЕ КАПЛИ
+with a3: j_drops = st.number_input("Капель", min_value=1, step=1, value=1, key="jdr")
 with a4: add_btn = st.button("➕ Добавить", use_container_width=True, key="jbtn")
 
-if add_btn and j_drops > 0:
+if add_btn:
     lbl = f"{j_comp} ({j_concentration}%)" if j_concentration < 100 else f"{j_comp} (чистый)"
-    st.session_state.formula.append({"label": lbl, "drops": j_drops})
+    st.session_state.formula.append({
+        "label": lbl, 
+        "drops": int(j_drops),
+        "comp_name": j_comp,
+        "concentration": j_concentration
+    })
     st.rerun()
 
 if st.session_state.formula:
     st.divider()
     total_ing = sum(i["drops"] for i in st.session_state.formula)
+    
+    # ✅ РАСЧЁТ С ПРОВЕРКОЙ IFRA
     rows = []
+    has_violation = False
     for i in st.session_state.formula:
         pc = round((i["drops"]/total_ing)*100, 2) if total_ing > 0 else 0
         pf = round((i["drops"]/j_total)*100, 3) if j_total > 0 else 0
-        rows.append({"Компонент": i["label"], "Капли": i["drops"], "% в концентрате": pc, "% в готовом": pf})
-    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
-    if abs(total_ing - j_conc_drops) > 0.5:
+        
+        # Проверка IFRA для готового продукта
+        comp_data = COMPONENTS.get(i["comp_name"], {})
+        ifra_limit = comp_data.get("ifra_limit", 100.0)
+        status = "✅"
+        if ifra_limit < 100.0 and pf > ifra_limit:
+            status = "❌ ПРЕВЫШЕНИЕ!🙀🙀🙀"
+            has_violation = True
+        
+        rows.append({
+            "Компонент": i["label"], 
+            "Капли": i["drops"], 
+            "% конц.": pc, 
+            "% готов.": pf,
+            "IFRA": status
+        })
+    
+    df = pd.DataFrame(rows)
+    # ✅ ПОДСВЕТКА НАРУШЕНИЙ КРАСНЫМ
+    def highlight_violation(row):
+        if "ПРЕВЫШЕНИЕ" in str(row["IFRA"]):
+            return ["background-color: #ffcccc"] * len(row)
+        return [""] * len(row)
+    
+    st.dataframe(df.style.apply(highlight_violation, axis=1), use_container_width=True, hide_index=True)
+    
+    if has_violation:
+        st.error("🚨 ВНИМАНИЕ: Обнаружено превышение лимитов IFRA в готовом продукте! Снизьте дозировку.")
+    
+    if abs(total_ing - j_conc_drops) > 0:
         st.warning(f"⚠️ Сумма ингредиентов ({total_ing}) ≠ концентрату ({j_conc_drops})")
 
     tname = st.text_input("Название теста", placeholder="Живой Лес v4.0", key="tn")
-    if st.button("💾 Сохранить", type="primary", use_container_width=True, key="sbtn"):
+    # ✅ БЛОКИРОВКА СОХРАНЕНИЯ ПРИ НАРУШЕНИИ IFRA
+    save_disabled = has_violation
+    if st.button("💾 Сохранить", type="primary", use_container_width=True, key="sbtn", disabled=save_disabled):
         if tname.strip():
             jr = []
             for i in st.session_state.formula:
