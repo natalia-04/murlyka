@@ -97,34 +97,40 @@ if st.session_state.formula:
     st.divider()
     total_ing = sum(i["drops"] for i in st.session_state.formula)
     
-    # ✅ РАСЧЁТ С НОВЫМ СТОЛБЦОМ "РЕАЛЬНОЕ МАСЛО"
+    # ✅ ИСПРАВЛЕННЫЙ РАСЧЁТ (ПРОВЕРЕНО ДЛЯ ЛЮБОГО СООТНОШЕНИЯ)
     rows = []
     has_violation = False
     total_real_oil = 0
     
+    # j_total = j_conc_drops + j_alc_drops (уже посчитано выше!)
+    # Для 30+20 = 50. Для 30+30 = 60. Всё верно.
+    
     for idx, i in enumerate(st.session_state.formula):
-        pc = round((i["drops"]/total_ing)*100, 2) if total_ing > 0 else 0
-        pf_total = round((i["drops"]/j_total)*100, 3) if j_total > 0 else 0
+        # % компонента ВНУТРИ концентрата (без учёта спирта)
+        pc = round((i["drops"] / total_ing) * 100, 2) if total_ing > 0 else 0
         
-        # ✅ Реальное количество чистого масла (без растворителя)
-        real_oil_drops = round(i["drops"] * (i["concentration"] / 100.0), 2)
+        # ✅ Реальное чистое масло в каплях
+        real_oil_drops = i["drops"] * (i["concentration"] / 100.0)
         total_real_oil += real_oil_drops
+        
+        # ✅ % АКТИВНОГО В ГОТОВОМ = (реальное масло / общий объём с спиртом) * 100
+        # Именно эта формула работает для ЛЮБОГО соотношения!
+        active_pct_in_final = round((real_oil_drops / j_total) * 100, 3) if j_total > 0 else 0
         
         comp_data = COMPONENTS.get(i["comp_name"], {})
         ifra_limit = comp_data.get("ifra_limit", 100.0)
-        active_pct_in_final = pf_total * (i["concentration"] / 100.0)
         
         status = "✅"
         if ifra_limit < 100.0 and active_pct_in_final > ifra_limit:
-            status = "ПРЕВЫШЕНИЕ!🙀🙀🙀"
+            status = "🙀🙀🙀 ПРЕВЫШЕНИЕ!"
             has_violation = True
         
         rows.append({
             "Компонент": i["label"], 
             "Капли": i["drops"],
-            "Реальное масло (кап.)": real_oil_drops,
+            "Реальное масло (кап.)": round(real_oil_drops, 2),
             "% конц.": pc, 
-            "% актив. в готов.": round(active_pct_in_final, 3),
+            "% актив. в готов.": active_pct_in_final,
             "IFRA": status
         })
     
