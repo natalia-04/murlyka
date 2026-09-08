@@ -97,26 +97,30 @@ if st.session_state.formula:
     st.divider()
     total_ing = sum(i["drops"] for i in st.session_state.formula)
     
-    # ✅ РАСЧЁТ С ПРОВЕРКОЙ IFRA
+    # ✅ ИСПРАВЛЕННЫЙ РАСЧЁТ С УЧЁТОМ КОНЦЕНТРАЦИИ ДИЛЮЦИИ
     rows = []
     has_violation = False
     for i in st.session_state.formula:
         pc = round((i["drops"]/total_ing)*100, 2) if total_ing > 0 else 0
-        pf = round((i["drops"]/j_total)*100, 3) if j_total > 0 else 0
+        pf_total = round((i["drops"]/j_total)*100, 3) if j_total > 0 else 0
         
-        # Проверка IFRA для готового продукта
+        # ✅ КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: учитываем концентрацию дилюции!
         comp_data = COMPONENTS.get(i["comp_name"], {})
         ifra_limit = comp_data.get("ifra_limit", 100.0)
+        
+        # Реальный % АКТИВНОГО вещества в готовом продукте
+        active_pct_in_final = pf_total * (i["concentration"] / 100.0)
+        
         status = "✅"
-        if ifra_limit < 100.0 and pf > ifra_limit:
-            status = "❌ ПРЕВЫШЕНИЕ!🙀🙀🙀"
+        if ifra_limit < 100.0 and active_pct_in_final > ifra_limit:
+            status = "❌ ПРЕВЫШЕНИЕ!"
             has_violation = True
         
         rows.append({
             "Компонент": i["label"], 
             "Капли": i["drops"], 
             "% конц.": pc, 
-            "% готов.": pf,
+            "% актив. в готов.": round(active_pct_in_final, 3),
             "IFRA": status
         })
     
