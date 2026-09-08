@@ -154,33 +154,6 @@ if st.session_state.formula:
                 st.session_state.formula.pop(idx)
                 st.rerun()
 
-    # ✅ СОХРАНЕНИЕ (без мгновенного исчезновения!)
-    st.divider()
-    tname = st.text_input("Название теста", placeholder="Живой Лес v4.0", key="tn")
-    
-    if st.button("💾 Сохранить", type="primary", use_container_width=True, key="sbtn", disabled=has_violation):
-        if tname.strip():
-            jr = []
-            for i in st.session_state.formula:
-                pc = round((i["drops"]/total_ing)*100, 2) if total_ing > 0 else 0
-                pf = round((i["drops"]/j_total)*100, 3) if j_total > 0 else 0
-                jr.append({"Название": tname, "Дата": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                           "Компонент": i["label"], "Капли": i["drops"], "% конц.": pc, "% готов.": pf})
-            # ✅ Сохраняем результат, НЕ очищаем формулу сразу
-            st.session_state.saved_journal = pd.DataFrame(jr)
-            st.success(f"✅ '{tname}' сохранён!")
-        else:
-            st.warning("⚠️ Введите название!")
-    
-    # ✅ Показываем сохранённый результат + кнопка нового теста
-    if st.session_state.saved_journal is not None:
-        st.divider()
-        st.subheader("💾 Последний сохранённый тест")
-        st.dataframe(st.session_state.saved_journal, use_container_width=True, hide_index=True)
-        if st.button("🆕 Новый тест (очистить формулу)", use_container_width=True, key="new_test"):
-            st.session_state.formula = []
-            st.session_state.saved_journal = None
-            st.rerun()
 
 else:
     st.info("👆 Добавьте ингредиенты выше")
