@@ -60,13 +60,23 @@ if st.button("Рассчитать!", type="primary", use_container_width=True, 
     with m2: st.metric("Максимум по IFRA", f"{mx} кап.", f"{e_ifra:.2f}%")
 
 # ==========================================
-# 👇 НИЗ: ЖУРНАЛ ТЕСТОВ
+# 👇 НИЗ: ЖУРНАЛ ТЕСТОВ (ИСПРАВЛЕНО!)
 # ==========================================
 st.divider()
 st.header("📓 Журнал Тестов")
 
 if "formula" not in st.session_state:
     st.session_state.formula = []
+if "delete_idx" not in st.session_state:
+    st.session_state.delete_idx = None
+
+# Обработка удаления ДО рендеринга
+if st.session_state.delete_idx is not None:
+    idx_to_del = st.session_state.delete_idx
+    if 0 <= idx_to_del < len(st.session_state.formula):
+        st.session_state.formula.pop(idx_to_del)
+    st.session_state.delete_idx = None
+    st.rerun()
 
 jv1, jv2 = st.columns(2)
 with jv1: j_conc_drops = st.slider("Капель концентрата", 1, 100, 30, key="jcd")
@@ -83,7 +93,10 @@ with a4: add_btn = st.button("➕ Добавить", use_container_width=True, k
 
 if add_btn:
     lbl = f"{j_comp} ({j_concentration}%)" if j_concentration < 100 else f"{j_comp} (чистый)"
+    # ✅ Добавляем уникальный timestamp как ID
+    import time
     st.session_state.formula.append({
+        "id": str(time.time()),
         "label": lbl, 
         "drops": int(j_drops),
         "comp_name": j_comp,
@@ -95,22 +108,19 @@ if st.session_state.formula:
     st.divider()
     total_ing = sum(i["drops"] for i in st.session_state.formula)
     
-    # ✅ РАСЧЁТ С ПРОВЕРКОЙ IFRA (ИСПРАВЛЕННАЯ МАТЕМАТИКА ДИЛЮЦИЙ)
     rows = []
     has_violation = False
-    for idx, i in enumerate(st.session_state.formula):
+    for i in st.session_state.formula:
         pc = round((i["drops"]/total_ing)*100, 2) if total_ing > 0 else 0
         pf_total = round((i["drops"]/j_total)*100, 3) if j_total > 0 else 0
         
         comp_data = COMPONENTS.get(i["comp_name"], {})
         ifra_limit = comp_data.get("ifra_limit", 100.0)
-        
-        # ✅ Реальный % АКТИВНОГО вещества в готовом продукте
         active_pct_in_final = pf_total * (i["concentration"] / 100.0)
         
         status = "✅"
         if ifra_limit < 100.0 and active_pct_in_final > ifra_limit:
-            status = "❌ ПРЕВЫШЕНИЕ!"
+            status = "❌ ПРЕВЫШЕНИЕ!🙀🙀🙀"
             has_violation = True
         
         rows.append({
@@ -131,27 +141,29 @@ if st.session_state.formula:
     st.dataframe(df.style.apply(highlight_violation, axis=1), use_container_width=True, hide_index=True)
     
     if has_violation:
-        st.error("🚨 ВНИМАНИЕ: Обнаружено превышение лимитов IFRA! Снизьте дозировку.")
+        st.error("🙀🙀🙀 ВНИМАНИЕ: Превышение лимитов IFRA!")
     
     if abs(total_ing - j_conc_drops) > 0:
         st.warning(f"⚠️ Сумма ингредиентов ({total_ing}) ≠ концентрату ({j_conc_drops})")
 
-    # ✅ КНОПКИ УДАЛЕНИЯ ДЛЯ КАЖДОГО ИНГРЕДИЕНТА
-    st.subheader("🗑️ Управление ингредиентами")
-    del_cols = st.columns(len(st.session_state.formula))
+    # ✅ БЕЗОПАСНЫЕ КНОПКИ УДАЛЕНИЯ (через session_state)
+    st.subheader("🗑️ Управление")
+    del_cols = st.columns(min(len(st.session_state.formula), 6))
     for idx, item in enumerate(st.session_state.formula):
-        with del_cols[idx]:
-            if st.button(f"❌ {item['label']}", key=f"del_{idx}", use_container_width=True):
-                st.session_state.formula.pop(idx)
+        col_idx = idx % 6
+        with del_cols[col_idx]:
+            # Используем уникальный ID компонента в ключе кнопки
+            btn_key = f"del_{item['id']}"
+            if st.button(f"❌ {item['label'][:15]}", key=btn_key, use_container_width=True):
+                st.session_state.delete_idx = idx
                 st.rerun()
 
-    # ✅ КНОПКА КОПИРОВАНИЯ ТАБЛИЦЫ
+    # ✅ КОПИРОВАНИЕ ТАБЛИЦЫ
     st.divider()
     copy_text = df.to_csv(sep='\t', index=False)
     st.text_area("📋 Скопируйте таблицу (Ctrl+C)", value=copy_text, height=150, key="copy_area")
-    st.caption("Формат TSV — вставляется в Excel/Google Sheets/Notion идеально")
+    st.caption("TSV-формат — идеально для Excel/Notion")
 
-    # Сохранение
     tname = st.text_input("Название теста", placeholder="Живой Лес v4.0", key="tn")
     save_disabled = has_violation
     if st.button("💾 Сохранить", type="primary", use_container_width=True, key="sbtn", disabled=save_disabled):
