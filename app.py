@@ -2,6 +2,7 @@ import streamlit as st
 from datetime import datetime
 import pandas as pd
 
+# === ОБЩАЯ БАЗА КОМПОНЕНТОВ ===
 COMPONENTS = {
     "Iso E Super® (IFF)": {"ifra_limit": 20.0, "rec_dose": 20.0},
     "Ivy base 290958 (Firmenich)": {"ifra_limit": 3.0, "rec_dose": 1.5},
@@ -31,14 +32,12 @@ COMPONENTS = {
 st.set_page_config(page_title="Murlyka Lab", page_icon="🐱", layout="wide")
 st.title("🐱 Murlyka Lab")
 
-# ✅ ЖЕЛЕЗОБЕТОННАЯ ИНИЦИАЛИЗАЦИЯ
-if "formula" not in st.session_state:
-    st.session_state.formula = []
-
 # ==========================================
-# 🔝 КАЛЬКУЛЯТОР (БЕЗ ИЗМЕНЕНИЙ)
+# 🔝 ВЕРХ: КАЛЬКУЛЯТОР БЕЗОПАСНОСТИ
 # ==========================================
 st.header("🧪 Калькулятор Безопасности")
+st.caption("Проверка лимитов IFRA в ГОТОВОМ продукте")
+
 cv1, cv2 = st.columns(2)
 with cv1: calc_conc_drops = st.slider("Капель концентрата", 1, 100, 30, key="ccd")
 with cv2: calc_alc_drops = st.slider("Капель спирта", 0, 200, 30, key="cad")
@@ -63,10 +62,16 @@ if st.button("Рассчитать!", type="primary", use_container_width=True, 
     with m2: st.metric("Максимум по IFRA", f"{mx} кап.", f"{e_ifra:.2f}%")
 
 # ==========================================
-# 👇 ЖУРНАЛ (МАКСИМАЛЬНО ПРОСТОЙ)
+# 👇 НИЗ: ЖУРНАЛ ТЕСТОВ
 # ==========================================
 st.divider()
 st.header("📓 Журнал Тестов")
+st.caption("Сборка формулы + запись % в готовом продукте")
+
+if "formula" not in st.session_state:
+    st.session_state.formula = []
+if "show_copy_area" not in st.session_state:
+    st.session_state.show_copy_area = False
 
 jv1, jv2 = st.columns(2)
 with jv1: j_conc_drops = st.slider("Капель концентрата", 1, 100, 30, key="jcd")
@@ -74,83 +79,95 @@ with jv2: j_alc_drops = st.slider("Капель спирта", 0, 200, 30, key="
 j_total = j_conc_drops + j_alc_drops
 st.caption(f"Готовый продукт: **{j_total} капель**")
 
-# ✅ ДОБАВЛЕНИЕ: просто кнопка, без form
 st.subheader("🧪 Добавить ингредиент")
 a1, a2, a3, a4 = st.columns([2,2,1,1])
 with a1: j_comp = st.selectbox("Компонент", list(COMPONENTS.keys()), key="jcomp")
 with a2: j_concentration = st.selectbox("Концентрация (%)", [100,50,30,20,10,5,2,1], index=0, key="jconc")
 with a3: j_drops = st.number_input("Капель", min_value=1, step=1, value=1, key="jdr")
-with a4: 
-    add_clicked = st.button("➕ Добавить", use_container_width=True, key="jbtn")
+with a4: add_btn = st.button("➕ Добавить", use_container_width=True, key="jbtn")
 
-# ✅ ПРЯМОЕ ДОБАВЛЕНИЕ БЕЗ RERUN
-if add_clicked and j_drops >= 1:
+if add_btn:
     lbl = f"{j_comp} ({j_concentration}%)" if j_concentration < 100 else f"{j_comp} (чистый)"
-    new_item = {
-        "label": lbl,
+    st.session_state.formula.append({
+        "label": lbl, 
         "drops": int(j_drops),
         "comp_name": j_comp,
         "concentration": j_concentration
-    }
-    # ✅ АТОМАРНОЕ ОБНОВЛЕНИЕ СПИСКА
-    current = list(st.session_state.formula)
-    current.append(new_item)
-    st.session_state.formula = current
+    })
+    st.rerun()
 
-# ✅ ТАБЛИЦА И УДАЛЕНИЕ
-if len(st.session_state.formula) > 0:
+if st.session_state.formula:
     st.divider()
     total_ing = sum(i["drops"] for i in st.session_state.formula)
     
+    # ✅ РАСЧЁТ С ПРОВЕРКОЙ IFRA (ИСПРАВЛЕННАЯ МАТЕМАТИКА ДИЛЮЦИЙ)
     rows = []
     has_violation = False
-    for i in st.session_state.formula:
+    for idx, i in enumerate(st.session_state.formula):
         pc = round((i["drops"]/total_ing)*100, 2) if total_ing > 0 else 0
         pf_total = round((i["drops"]/j_total)*100, 3) if j_total > 0 else 0
+        
         comp_data = COMPONENTS.get(i["comp_name"], {})
         ifra_limit = comp_data.get("ifra_limit", 100.0)
+        
+        # ✅ Реальный % АКТИВНОГО вещества в готовом продукте
         active_pct_in_final = pf_total * (i["concentration"] / 100.0)
+        
         status = "✅"
         if ifra_limit < 100.0 and active_pct_in_final > ifra_limit:
             status = "❌ ПРЕВЫШЕНИЕ!"
             has_violation = True
+        
         rows.append({
-            "Компонент": i["label"],
-            "Капли": i["drops"],
-            "% конц.": pc,
+            "Компонент": i["label"], 
+            "Капли": i["drops"], 
+            "% конц.": pc, 
             "% актив. в готов.": round(active_pct_in_final, 3),
             "IFRA": status
         })
     
     df = pd.DataFrame(rows)
+    
+    # ✅ КНОПКА КОПИРОВАНИЯ (компактная, по клику)
+    col_copy, col_spacer = st.columns([1, 3])
+    with col_copy:
+        if st.button("📋 Скопировать таблицу", use_container_width=True, key="copy_btn"):
+            st.session_state.show_copy_area = True
+    
+    if st.session_state.show_copy_area:
+        copy_text = df.to_csv(sep='\t', index=False)
+        st.text_area("", value=copy_text, height=80, key="copy_area")
+        st.caption("Ctrl+A → Ctrl+C для копирования")
+        if st.button("✕ Закрыть", key="close_copy"):
+            st.session_state.show_copy_area = False
+            st.rerun()
+    
     def highlight_violation(row):
         if "ПРЕВЫШЕНИЕ" in str(row["IFRA"]):
             return ["background-color: #ffcccc"] * len(row)
         return [""] * len(row)
+    
     st.dataframe(df.style.apply(highlight_violation, axis=1), use_container_width=True, hide_index=True)
     
     if has_violation:
-        st.error("🚨 ВНИМАНИЕ: Превышение лимитов IFRA!")
+        st.error("🚨 ВНИМАНИЕ: Обнаружено превышение лимитов IFRA! Снизьте дозировку.")
+    
     if abs(total_ing - j_conc_drops) > 0:
         st.warning(f"⚠️ Сумма ингредиентов ({total_ing}) ≠ концентрату ({j_conc_drops})")
 
-    # ✅ УДАЛЕНИЕ: ОДИН СЕЛЕКТОР + ОДНА КНОПКА
-    st.subheader("🗑️ Удалить ингредиент")
-    del_labels = [f"{i['label']} ({i['drops']} кап.)" for i in st.session_state.formula]
-    del_choice = st.selectbox("Выберите для удаления", del_labels, key="del_choice")
-    if st.button("❌ Удалить выбранный", key="del_btn"):
-        idx_to_del = del_labels.index(del_choice)
-        current = list(st.session_state.formula)
-        current.pop(idx_to_del)
-        st.session_state.formula = current
-        st.rerun()
+    # ✅ КНОПКИ УДАЛЕНИЯ ДЛЯ КАЖДОГО ИНГРЕДИЕНТА
+    st.subheader("🗑️ Управление ингредиентами")
+    del_cols = st.columns(min(len(st.session_state.formula), 6))
+    for idx, item in enumerate(st.session_state.formula):
+        col_idx = idx % 6
+        with del_cols[col_idx]:
+            short_label = item['label'][:15] + ".." if len(item['label']) > 15 else item['label']
+            if st.button(f"❌ {short_label}", key=f"del_{idx}", use_container_width=True):
+                st.session_state.formula.pop(idx)
+                st.rerun()
 
-    # ✅ КОПИРОВАНИЕ
+    # Сохранение
     st.divider()
-    copy_text = df.to_csv(sep='\t', index=False)
-    st.text_area("📋 Скопируйте таблицу (Ctrl+C)", value=copy_text, height=150, key="copy_area")
-    st.caption("TSV-формат — идеально для Excel/Notion")
-
     tname = st.text_input("Название теста", placeholder="Живой Лес v4.0", key="tn")
     save_disabled = has_violation
     if st.button("💾 Сохранить", type="primary", use_container_width=True, key="sbtn", disabled=save_disabled):
@@ -164,6 +181,7 @@ if len(st.session_state.formula) > 0:
             st.success(f"✅ '{tname}' сохранён!")
             st.dataframe(pd.DataFrame(jr), use_container_width=True, hide_index=True)
             st.session_state.formula = []
+            st.session_state.show_copy_area = False
             st.rerun()
         else:
             st.warning("⚠️ Введите название!")
