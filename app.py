@@ -2,7 +2,6 @@ import streamlit as st
 from datetime import datetime
 import pandas as pd
 
-# === ОБЩАЯ БАЗА КОМПОНЕНТОВ ===
 COMPONENTS = {
     "Iso E Super® (IFF)": {"ifra_limit": 20.0, "rec_dose": 20.0},
     "Ivy base 290958 (Firmenich)": {"ifra_limit": 3.0, "rec_dose": 1.5},
@@ -36,7 +35,6 @@ st.title("🐱 Murlyka Lab")
 # 🔝 ВЕРХ: КАЛЬКУЛЯТОР БЕЗОПАСНОСТИ
 # ==========================================
 st.header("🧪 Калькулятор Безопасности")
-st.caption("Проверка лимитов IFRA в ГОТОВОМ продукте")
 
 cv1, cv2 = st.columns(2)
 with cv1: calc_conc_drops = st.slider("Капель концентрата", 1, 100, 30, key="ccd")
@@ -66,12 +64,11 @@ if st.button("Рассчитать!", type="primary", use_container_width=True, 
 # ==========================================
 st.divider()
 st.header("📓 Журнал Тестов")
-st.caption("Сборка формулы + запись % в готовом продукте")
 
 if "formula" not in st.session_state:
     st.session_state.formula = []
-if "show_copy_area" not in st.session_state:
-    st.session_state.show_copy_area = False
+if "saved_journal" not in st.session_state:
+    st.session_state.saved_journal = None
 
 jv1, jv2 = st.columns(2)
 with jv1: j_conc_drops = st.slider("Капель концентрата", 1, 100, 30, key="jcd")
@@ -100,7 +97,6 @@ if st.session_state.formula:
     st.divider()
     total_ing = sum(i["drops"] for i in st.session_state.formula)
     
-    # ✅ РАСЧЁТ С ПРОВЕРКОЙ IFRA (ИСПРАВЛЕННАЯ МАТЕМАТИКА ДИЛЮЦИЙ)
     rows = []
     has_violation = False
     for idx, i in enumerate(st.session_state.formula):
@@ -109,8 +105,6 @@ if st.session_state.formula:
         
         comp_data = COMPONENTS.get(i["comp_name"], {})
         ifra_limit = comp_data.get("ifra_limit", 100.0)
-        
-        # ✅ Реальный % АКТИВНОГО вещества в готовом продукте
         active_pct_in_final = pf_total * (i["concentration"] / 100.0)
         
         status = "✅"
@@ -128,19 +122,13 @@ if st.session_state.formula:
     
     df = pd.DataFrame(rows)
     
-    # ✅ КНОПКА КОПИРОВАНИЯ (компактная, по клику)
-    col_copy, col_spacer = st.columns([1, 3])
-    with col_copy:
-        if st.button("📋 Скопировать таблицу", use_container_width=True, key="copy_btn"):
-            st.session_state.show_copy_area = True
-    
-    if st.session_state.show_copy_area:
-        copy_text = df.to_csv(sep='\t', index=False)
-        st.text_area("", value=copy_text, height=80, key="copy_area")
-        st.caption("Ctrl+A → Ctrl+C для копирования")
-        if st.button("✕ Закрыть", key="close_copy"):
-            st.session_state.show_copy_area = False
-            st.rerun()
+    # ✅ КОПИРОВАНИЕ В ОДИН КЛИК (JavaScript)
+    copy_text = df.to_csv(sep='\t', index=False)
+    st.components.v1.html(f"""
+        <button onclick="navigator.clipboard.writeText(`{copy_text}`);this.innerText='✅ Скопировано!';setTimeout(()=>this.innerText='📋 Скопировать таблицу',2000);"
+        style="width:100%;padding:10px;border:none;border-radius:6px;background:#ff4b4b;color:white;font-size:16px;cursor:pointer;">
+        📋 Скопировать таблицу</button>
+    """, height=50)
     
     def highlight_violation(row):
         if "ПРЕВЫШЕНИЕ" in str(row["IFRA"]):
@@ -150,27 +138,27 @@ if st.session_state.formula:
     st.dataframe(df.style.apply(highlight_violation, axis=1), use_container_width=True, hide_index=True)
     
     if has_violation:
-        st.error("🚨 ВНИМАНИЕ: Обнаружено превышение лимитов IFRA! Снизьте дозировку.")
+        st.error("🚨 ВНИМАНИЕ: Превышение лимитов IFRA!")
     
     if abs(total_ing - j_conc_drops) > 0:
         st.warning(f"⚠️ Сумма ингредиентов ({total_ing}) ≠ концентрату ({j_conc_drops})")
 
-    # ✅ КНОПКИ УДАЛЕНИЯ ДЛЯ КАЖДОГО ИНГРЕДИЕНТА
-    st.subheader("🗑️ Управление ингредиентами")
+    # ✅ УДАЛЕНИЕ ИНГРЕДИЕНТОВ
+    st.subheader("🗑️ Управление")
     del_cols = st.columns(min(len(st.session_state.formula), 6))
     for idx, item in enumerate(st.session_state.formula):
         col_idx = idx % 6
         with del_cols[col_idx]:
-            short_label = item['label'][:15] + ".." if len(item['label']) > 15 else item['label']
+            short_label = item['label'][:12] + ".." if len(item['label']) > 12 else item['label']
             if st.button(f"❌ {short_label}", key=f"del_{idx}", use_container_width=True):
                 st.session_state.formula.pop(idx)
                 st.rerun()
 
-    # Сохранение
+    # ✅ СОХРАНЕНИЕ (без мгновенного исчезновения!)
     st.divider()
     tname = st.text_input("Название теста", placeholder="Живой Лес v4.0", key="tn")
-    save_disabled = has_violation
-    if st.button("💾 Сохранить", type="primary", use_container_width=True, key="sbtn", disabled=save_disabled):
+    
+    if st.button("💾 Сохранить", type="primary", use_container_width=True, key="sbtn", disabled=has_violation):
         if tname.strip():
             jr = []
             for i in st.session_state.formula:
@@ -178,12 +166,21 @@ if st.session_state.formula:
                 pf = round((i["drops"]/j_total)*100, 3) if j_total > 0 else 0
                 jr.append({"Название": tname, "Дата": datetime.now().strftime("%Y-%m-%d %H:%M"),
                            "Компонент": i["label"], "Капли": i["drops"], "% конц.": pc, "% готов.": pf})
+            # ✅ Сохраняем результат, НЕ очищаем формулу сразу
+            st.session_state.saved_journal = pd.DataFrame(jr)
             st.success(f"✅ '{tname}' сохранён!")
-            st.dataframe(pd.DataFrame(jr), use_container_width=True, hide_index=True)
-            st.session_state.formula = []
-            st.session_state.show_copy_area = False
-            st.rerun()
         else:
             st.warning("⚠️ Введите название!")
+    
+    # ✅ Показываем сохранённый результат + кнопка нового теста
+    if st.session_state.saved_journal is not None:
+        st.divider()
+        st.subheader("💾 Последний сохранённый тест")
+        st.dataframe(st.session_state.saved_journal, use_container_width=True, hide_index=True)
+        if st.button("🆕 Новый тест (очистить формулу)", use_container_width=True, key="new_test"):
+            st.session_state.formula = []
+            st.session_state.saved_journal = None
+            st.rerun()
+
 else:
     st.info("👆 Добавьте ингредиенты выше")
