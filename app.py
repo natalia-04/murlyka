@@ -109,7 +109,7 @@ if st.session_state.formula:
         
         status = "✅"
         if ifra_limit < 100.0 and active_pct_in_final > ifra_limit:
-            status = "❌ ПРЕВЫШЕНИЕ!"
+            status = "❌ ПРЕВЫШЕНИЕ!🙀🙀🙀"
             has_violation = True
         
         rows.append({
@@ -138,7 +138,7 @@ if st.session_state.formula:
     st.dataframe(df.style.apply(highlight_violation, axis=1), use_container_width=True, hide_index=True)
     
     if has_violation:
-        st.error("🚨 ВНИМАНИЕ: Превышение лимитов IFRA!")
+        st.error("🙀ВНИМАНИЕ: Превышение лимитов IFRA! Cнизьте концентрацию!")
     
     if abs(total_ing - j_conc_drops) > 0:
         st.warning(f"⚠️ Сумма ингредиентов ({total_ing}) ≠ концентрату ({j_conc_drops})")
