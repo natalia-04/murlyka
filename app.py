@@ -51,7 +51,6 @@ if st.button("Рассчитать!", type="primary", use_container_width=True, 
     cf = calc_conc / 100.0
     e_ifra = 100.0 if d["ifra_limit"] == 100.0 else d["ifra_limit"] / cf
     e_rec = d["rec_dose"] / cf
-    # ✅ ЦЕЛЫЕ КАПЛИ (округление вниз для безопасности)
     mx = int(calc_total * e_ifra / 100)
     rc = round(calc_total * e_rec / 100, 1)
     st.divider()
@@ -79,7 +78,6 @@ st.subheader("🧪 Добавить ингредиент")
 a1, a2, a3, a4 = st.columns([2,2,1,1])
 with a1: j_comp = st.selectbox("Компонент", list(COMPONENTS.keys()), key="jcomp")
 with a2: j_concentration = st.selectbox("Концентрация (%)", [100,50,30,20,10,5,2,1], index=0, key="jconc")
-# ✅ ТОЛЬКО ЦЕЛЫЕ КАПЛИ
 with a3: j_drops = st.number_input("Капель", min_value=1, step=1, value=1, key="jdr")
 with a4: add_btn = st.button("➕ Добавить", use_container_width=True, key="jbtn")
 
@@ -97,18 +95,17 @@ if st.session_state.formula:
     st.divider()
     total_ing = sum(i["drops"] for i in st.session_state.formula)
     
-    # ✅ ИСПРАВЛЕННЫЙ РАСЧЁТ С УЧЁТОМ КОНЦЕНТРАЦИИ ДИЛЮЦИИ
+    # ✅ РАСЧЁТ С ПРОВЕРКОЙ IFRA (ИСПРАВЛЕННАЯ МАТЕМАТИКА ДИЛЮЦИЙ)
     rows = []
     has_violation = False
-    for i in st.session_state.formula:
+    for idx, i in enumerate(st.session_state.formula):
         pc = round((i["drops"]/total_ing)*100, 2) if total_ing > 0 else 0
         pf_total = round((i["drops"]/j_total)*100, 3) if j_total > 0 else 0
         
-        # ✅ КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: учитываем концентрацию дилюции!
         comp_data = COMPONENTS.get(i["comp_name"], {})
         ifra_limit = comp_data.get("ifra_limit", 100.0)
         
-        # Реальный % АКТИВНОГО вещества в готовом продукте
+        # ✅ Реальный % АКТИВНОГО вещества в готовом продукте
         active_pct_in_final = pf_total * (i["concentration"] / 100.0)
         
         status = "✅"
@@ -125,7 +122,7 @@ if st.session_state.formula:
         })
     
     df = pd.DataFrame(rows)
-    # ✅ ПОДСВЕТКА НАРУШЕНИЙ КРАСНЫМ
+    
     def highlight_violation(row):
         if "ПРЕВЫШЕНИЕ" in str(row["IFRA"]):
             return ["background-color: #ffcccc"] * len(row)
@@ -134,13 +131,28 @@ if st.session_state.formula:
     st.dataframe(df.style.apply(highlight_violation, axis=1), use_container_width=True, hide_index=True)
     
     if has_violation:
-        st.error("🚨 ВНИМАНИЕ: Обнаружено превышение лимитов IFRA в готовом продукте! Снизьте дозировку.")
+        st.error("🚨 ВНИМАНИЕ: Обнаружено превышение лимитов IFRA! Снизьте дозировку.")
     
     if abs(total_ing - j_conc_drops) > 0:
         st.warning(f"⚠️ Сумма ингредиентов ({total_ing}) ≠ концентрату ({j_conc_drops})")
 
+    # ✅ КНОПКИ УДАЛЕНИЯ ДЛЯ КАЖДОГО ИНГРЕДИЕНТА
+    st.subheader("🗑️ Управление ингредиентами")
+    del_cols = st.columns(len(st.session_state.formula))
+    for idx, item in enumerate(st.session_state.formula):
+        with del_cols[idx]:
+            if st.button(f"❌ {item['label']}", key=f"del_{idx}", use_container_width=True):
+                st.session_state.formula.pop(idx)
+                st.rerun()
+
+    # ✅ КНОПКА КОПИРОВАНИЯ ТАБЛИЦЫ
+    st.divider()
+    copy_text = df.to_csv(sep='\t', index=False)
+    st.text_area("📋 Скопируйте таблицу (Ctrl+C)", value=copy_text, height=150, key="copy_area")
+    st.caption("Формат TSV — вставляется в Excel/Google Sheets/Notion идеально")
+
+    # Сохранение
     tname = st.text_input("Название теста", placeholder="Живой Лес v4.0", key="tn")
-    # ✅ БЛОКИРОВКА СОХРАНЕНИЯ ПРИ НАРУШЕНИИ IFRA
     save_disabled = has_violation
     if st.button("💾 Сохранить", type="primary", use_container_width=True, key="sbtn", disabled=save_disabled):
         if tname.strip():
