@@ -1,9 +1,8 @@
-# 🧪 ПАРФЮМЕРНЫЙ КАЛЬКУЛЯТОР MURLYKA v2.4 WEB
-# Сохрани как app.py и запусти: streamlit run app.py
+# 🧪 ПАРФЮМЕРНЫЙ КАЛЬКУЛЯТОР MURLYKA v2.5
+# ИСПРАВЛЕНА ЛОГИКА ДЛЯ ЛИМИТА 100% + УБРАНА НАДПИСЬ "БЕЗОПАСНО"
 
 import streamlit as st
 
-# === БАЗА КОМПОНЕНТОВ (ИЗ ТВОЕГО ФИНАЛЬНОГО СПИСКА) ===
 COMPONENTS = {
     "Iso E Super® (IFF)": {"ifra_limit": 20.0, "rec_dose": 20.0},
     "Ivy base 290958 (Firmenich)": {"ifra_limit": 3.0, "rec_dose": 1.5},
@@ -30,18 +29,14 @@ COMPONENTS = {
     "Bacdanol® TOCO (IFF)": {"ifra_limit": 100.0, "rec_dose": 5.0}
 }
 
-# === НАСТРОЙКА СТРАНИЦЫ ===
 st.set_page_config(page_title="Murlyka Calculator", page_icon="🐱", layout="centered")
 st.title("🧪 Парфюмерный Калькулятор Murlyka")
 st.caption("Расчёт безопасных доз с учётом концентрации дилюции")
 
-# === ИНТЕРФЕЙС ===
 col1, col2 = st.columns(2)
-
 with col1:
     drops = st.slider("Капель в тесте", min_value=1, max_value=100, value=30)
     component = st.selectbox("Компонент", list(COMPONENTS.keys()))
-
 with col2:
     concentration = st.selectbox(
         "Концентрация (%)",
@@ -49,19 +44,23 @@ with col2:
         index=0
     )
 
-# === РАСЧЁТ И ВЫВОД ===
 if st.button("Рассчитать!", type="primary", use_container_width=True):
     data = COMPONENTS[component]
     conc_fraction = concentration / 100.0
     
-    effective_ifra = data["ifra_limit"] / conc_fraction
+    # ✅ ИСПРАВЛЕННАЯ ЛОГИКА: если лимит 100%, он не меняется при дилюции
+    if data["ifra_limit"] == 100.0:
+        effective_ifra = 100.0
+    else:
+        effective_ifra = data["ifra_limit"] / conc_fraction
+        
     effective_rec = data["rec_dose"] / conc_fraction
     
     max_drops = round(drops * effective_ifra / 100, 3)
     rec_drops = round(drops * effective_rec / 100, 3)
     
     st.divider()
-    st.subheader(f" {component}")
+    st.subheader(f"📊 {component}")
     
     m1, m2 = st.columns(2)
     with m1:
@@ -69,7 +68,4 @@ if st.button("Рассчитать!", type="primary", use_container_width=True):
     with m2:
         st.metric("Максимум по IFRA", f"{max_drops} кап.", f"{effective_ifra:.2f}%")
     
-    if max_drops < rec_drops:
-        st.error("⚠️ Рекомендуемая доза превышает лимит IFRA!")
-    else:
-        st.success("✅ Доза в пределах безопасности")
+    # ✅ УБРАНА НАДПИСЬ "БЕЗОПАСНО". ТОЛЬКО ЦИФРЫ.
