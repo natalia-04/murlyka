@@ -68,23 +68,29 @@ tab_drops, tab_grams = st.tabs(["💧 Капли (To Do)", "⚖️ Граммы 
 # === ВКЛАДКА 1: КАПЛИ (TO DO) ===
 with tab_drops:
     st.header("📝 Черновик в каплях")
-    st.caption("Придумывай свободно. IFRA проверяется по объёмным % как оценка.")
+    st.caption("Придумывай свободно. IFRA проверяется по объёмным %.")
 
     if "formula_drops" not in st.session_state:
         st.session_state.formula_drops = []
 
-    # Общее количество капель для расчёта %
-    total_drops_input = st.number_input("Всего капель в тесте (для расчёта %)", min_value=1, value=30, step=1, key="total_drops")
+    # ✅ ПРОСТО: капли концентрата и капли спирта
+    dc1, dc2 = st.columns(2)
+    with dc1: total_conc_drops = st.number_input("Капли концентрата (всего)", min_value=1, value=30, step=1, key="tcd")
+    with dc2: total_alc_drops = st.number_input("Капли спирта", min_value=0, value=30, step=1, key="tad")
+    
+    total_mixture_drops = total_conc_drops + total_alc_drops
+    st.caption(f"Всего в смеси: **{total_mixture_drops} капель**")
 
     a1, a2, a3, a4 = st.columns([2, 1, 1, 1])
     with a1: d_comp = st.selectbox("Компонент", list(COMPONENTS.keys()), key="d_comp")
     with a2: d_conc = st.selectbox("Конц. %", [100,50,30,20,10,5,2,1], index=0, key="d_conc")
-    with a3: d_drops = st.number_input("Капли", min_value=0, step=1, value=1, key="d_drops")
+    with a3: d_drops = st.number_input("Капли компонента", min_value=0, step=1, value=1, key="d_drops")
     with a4: d_add = st.button("➕ Добавить", use_container_width=True, key="d_btn")
 
     if d_add and d_drops > 0:
-        vol_pct = round((d_drops / total_drops_input) * 100, 2) if total_drops_input > 0 else 0
-        real_oil_pct = round(vol_pct * (d_conc / 100.0), 2)
+        # ✅ % актив. = (капли_компонента / всего_смеси) * (концентрация / 100)
+        vol_pct_in_mix = (d_drops / total_mixture_drops) * 100 if total_mixture_drops > 0 else 0
+        real_oil_pct = round(vol_pct_in_mix * (d_conc / 100.0), 2)
         
         comp_data = COMPONENTS.get(d_comp, {})
         ifra_limit = comp_data.get("ifra_limit", 100.0)
@@ -112,7 +118,6 @@ with tab_drops:
 
         st.dataframe(df_drops.style.apply(highlight_violation_drops, axis=1), use_container_width=True, hide_index=True)
 
-        # Кнопка копирования для To Do
         copy_drops = df_drops.to_csv(sep='\t', index=False)
         st.components.v1.html(f"""
             <button onclick="navigator.clipboard.writeText(`{copy_drops}`);this.innerText='✅ Скопировано!';setTimeout(()=>this.innerText='📋 Скопировать To Do',2000);"
@@ -120,7 +125,6 @@ with tab_drops:
             📋 Скопировать To Do</button>
         """, height=45)
 
-        # Управление удалением
         del_cols = st.columns(min(len(st.session_state.formula_drops), 6))
         for idx, item in enumerate(st.session_state.formula_drops):
             col_idx = idx % 6
@@ -135,7 +139,6 @@ with tab_drops:
             st.rerun()
     else:
         st.info("👆 Добавь компоненты выше")
-
 
 # === ВКЛАДКА 2: ГРАММЫ (ЗАМЕС) ===
 with tab_grams:
