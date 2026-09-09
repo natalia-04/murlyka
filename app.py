@@ -304,5 +304,5 @@ with tab_grams:
                     st.rerun()
 
     
-else:
-    st.info("👆 Добавьте ингредиенты выше")
+    else:
+        st.info("👆 Добавьте ингредиенты выше")
