@@ -28,68 +28,6 @@ COMPONENTS = {
     "Bacdanol® TOCO (IFF)": {"ifra_limit": 100.0, "rec_dose": 5.0}
 }
 
-st.set_page_config(page_title="Murlyka Lab", page_icon="😺", layout="wide")
-st.title("😺 Murlyka Lab")
-
-# ==========================================
-# 🔝 ВЕРХ: КАЛЬКУЛЯТОР БЕЗОПАСНОСТИ
-# ==========================================
-st.header("🧪 Калькулятор Безопасности")
-
-cv1, cv2 = st.columns(2)
-with cv1: calc_conc = st.slider("Концентрат (г)", 0.01, 50.0, 1.0, step=0.01, format="%.2f", key="ccg")
-with cv2: calc_alc = st.slider("Спирт (г)", 0.0, 100.0, 1.0, step=0.01, format="%.2f", key="cag")
-calc_total = calc_conc + calc_alc
-st.caption(f"Готовый продукт: **{calc_total:.2f} г**")
-
-cc1, cc2 = st.columns(2)
-with cc1: calc_comp = st.selectbox("Компонент", list(COMPONENTS.keys()), key="ccomp")
-with cc2: calc_concentration = st.selectbox("Концентрация (%)", [100,50,30,20,10,5,2,1], index=0, key="cconc")
-
-if st.button("Рассчитать!", type="primary", use_container_width=True, key="cbtn"):
-    d = COMPONENTS[calc_comp]
-    cf = calc_concentration / 100.0
-    e_ifra = 100.0 if d["ifra_limit"] == 100.0 else d["ifra_limit"] / cf
-    e_rec = d["rec_dose"] / cf
-    mx = round(calc_total * e_ifra / 100, 3)
-    rc = round(calc_total * e_rec / 100, 3)
-    st.divider()
-    st.subheader(f"📊 {calc_comp}")
-    m1, m2 = st.columns(2)
-    with m1: st.metric("Рекомендуемая доза", f"{rc} г", f"{e_rec:.2f}%")
-    with m2: st.metric("Максимум по IFRA", f"{mx} г", f"{e_ifra:.2f}%")
-
-
-import streamlit as st
-from datetime import datetime
-import pandas as pd
-
-COMPONENTS = {
-    "Iso E Super® (IFF)": {"ifra_limit": 20.0, "rec_dose": 20.0},
-    "Ivy base 290958 (Firmenich)": {"ifra_limit": 3.0, "rec_dose": 1.5},
-    "Habanolide® 947303 (Firmenich)": {"ifra_limit": 100.0, "rec_dose": 5.0},
-    "CEDARWOOD HIMALAYAN EO": {"ifra_limit": 100.0, "rec_dose": 5.0},
-    "Mentha piperita EO": {"ifra_limit": 100.0, "rec_dose": 1.0},
-    "Ethyl Vanillin": {"ifra_limit": 100.0, "rec_dose": 8.0},
-    "HELIOTROPIN": {"ifra_limit": 100.0, "rec_dose": 0.8},
-    "Floralozone (IFF)": {"ifra_limit": 100.0, "rec_dose": 0.8},
-    "Patchouli EO": {"ifra_limit": 100.0, "rec_dose": 5.0},
-    "Отдушка Йогурт с курагой (Greenwax)": {"ifra_limit": 6.1, "rec_dose": 3.0},
-    "Отдушка Кофейня (Candle Science)": {"ifra_limit": 6.6, "rec_dose": 3.3},
-    "Отдушка Манго и кокосовое молоко (Candle Science)": {"ifra_limit": 74.99, "rec_dose": 37.0},
-    "Отдушка Пряный мед и тонка (Candle Science)": {"ifra_limit": 17.76, "rec_dose": 8.8},
-    "Ароматическое масло Молочный шоколад (Jean Claude)": {"ifra_limit": 35.0, "rec_dose": 17.5},
-    "Verdox HC (IFF)": {"ifra_limit": 100.0, "rec_dose": 4.0},
-    "Maltol (кристалл)": {"ifra_limit": 100.0, "rec_dose": 4.0},
-    "Triplal (IFF)": {"ifra_limit": 2.5, "rec_dose": 0.5},
-    "Blueberry Pie Oil (CND)": {"ifra_limit": 100.0, "rec_dose": 5.0},
-    "Theaspirane (Givaudan)": {"ifra_limit": 100.0, "rec_dose": 0.5},
-    "Delta Dodecalactone": {"ifra_limit": 100.0, "rec_dose": 1.5},
-    "Peru Balsam Resinoid": {"ifra_limit": 0.41, "rec_dose": 0.02},
-    "Cranberry Perfume Oil (CND)": {"ifra_limit": 100.0, "rec_dose": 5.0},
-    "Bacdanol® TOCO (IFF)": {"ifra_limit": 100.0, "rec_dose": 5.0}
-}
-
 st.set_page_config(page_title="Murlyka Lab", page_icon="🐱", layout="wide")
 st.title("🐱 Murlyka Lab")
 
@@ -303,6 +241,39 @@ with tab_grams:
                     st.session_state.formula_grams.pop(idx)
                     st.rerun()
 
-    
+        st.divider()
+        tname = st.text_input("Название теста", placeholder="Живой Лес v4.0", key="tn")
+
+        if st.button("💾 Сохранить", type="primary", use_container_width=True, key="sbtn", disabled=has_violation):
+            if tname.strip():
+                jr = []
+                for i in st.session_state.formula_grams:
+                    pc = round((i["grams"] / total_ing) * 100, 2) if total_ing > 0 else 0
+                    pf = round((i["grams"] / j_total) * 100, 3) if j_total > 0 else 0
+                    real_oil = round(i["grams"] * (i["concentration"] / 100.0), 3)
+                    jr.append({
+                        "Название": tname,
+                        "Дата": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                        "Компонент": i["label"],
+                        "Конц. %": i["concentration"],
+                        "Капли (справ.)": i["drops_ref"] if i["drops_ref"] > 0 else "—",
+                        "Граммы": i["grams"],
+                        "Масло (г)": real_oil,
+                        "% конц.": pc,
+                        "% готов.": pf
+                    })
+                st.session_state.saved_journal = pd.DataFrame(jr)
+                st.success(f"✅ '{tname}' сохранён!")
+            else:
+                st.warning("⚠️ Введите название!")
+
+        if st.session_state.saved_journal is not None:
+            st.divider()
+            st.subheader("💾 Последний сохранённый тест")
+            st.dataframe(st.session_state.saved_journal, use_container_width=True, hide_index=True)
+            if st.button("🆕 Новый тест (очистить формулу)", use_container_width=True, key="new_test"):
+                st.session_state.formula_grams = []
+                st.session_state.saved_journal = None
+                st.rerun()
     else:
         st.info("👆 Добавьте ингредиенты выше")
