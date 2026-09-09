@@ -28,36 +28,59 @@ COMPONENTS = {
     "Bacdanol® TOCO (IFF)": {"ifra_limit": 100.0, "rec_dose": 5.0}
 }
 
-st.set_page_config(page_title="Murlyka Lab", page_icon="🐱", layout="wide")
-st.title("🐱 Murlyka Lab")
+st.set_page_config(page_title="Murlyka Lab", page_icon="😺", layout="wide")
+st.title("😺 Murlyka Lab")
 
 # ==========================================
 # 🔝 ВЕРХ: КАЛЬКУЛЯТОР БЕЗОПАСНОСТИ
 # ==========================================
 st.header("🧪 Калькулятор Безопасности")
 
+# ✅ ВЫБОР ЕДИНИЦ ИЗМЕРЕНИЯ
+unit_mode = st.radio("Единицы измерения", ["Капли", "Граммы"], horizontal=True, key="calc_unit")
+
 cv1, cv2 = st.columns(2)
-with cv1: calc_conc_drops = st.slider("Капель концентрата", 1, 100, 30, key="ccd")
-with cv2: calc_alc_drops = st.slider("Капель спирта", 0, 200, 30, key="cad")
-calc_total = calc_conc_drops + calc_alc_drops
-st.caption(f"Готовый продукт: **{calc_total} капель**")
+with cv1:
+    if unit_mode == "Капли":
+        calc_conc = st.slider("Концентрат (кап.)", 1, 100, 30, key="ccd")
+    else:
+        calc_conc = st.number_input("Концентрат (г)", min_value=0.01, step=0.01, value=1.0, format="%.2f", key="ccg")
+with cv2:
+    if unit_mode == "Капли":
+        calc_alc = st.slider("Спирт (кап.)", 0, 200, 30, key="cad")
+    else:
+        calc_alc = st.number_input("Спирт (г)", min_value=0.0, step=0.01, value=1.0, format="%.2f", key="cag")
+
+calc_total = calc_conc + calc_alc
+unit_label = "капель" if unit_mode == "Капли" else "г"
+st.caption(f"Готовый продукт: **{calc_total:.2f} {unit_label}**")
 
 cc1, cc2 = st.columns(2)
 with cc1: calc_comp = st.selectbox("Компонент", list(COMPONENTS.keys()), key="ccomp")
-with cc2: calc_conc = st.selectbox("Концентрация (%)", [100,50,30,20,10,5,2,1], index=0, key="cconc")
+with cc2: calc_concentration = st.selectbox("Концентрация (%)", [100,50,30,20,10,5,2,1], index=0, key="cconc")
 
 if st.button("Рассчитать!", type="primary", use_container_width=True, key="cbtn"):
     d = COMPONENTS[calc_comp]
-    cf = calc_conc / 100.0
+    cf = calc_concentration / 100.0
     e_ifra = 100.0 if d["ifra_limit"] == 100.0 else d["ifra_limit"] / cf
     e_rec = d["rec_dose"] / cf
-    mx = int(calc_total * e_ifra / 100)
-    rc = round(calc_total * e_rec / 100, 1)
+    
+    # ✅ Расчёт максимума в выбранных единицах
+    mx_raw = calc_total * e_ifra / 100
+    rc_raw = calc_total * e_rec / 100
+    
+    if unit_mode == "Капли":
+        mx = int(mx_raw)
+        rc = round(rc_raw, 1)
+    else:
+        mx = round(mx_raw, 3)
+        rc = round(rc_raw, 3)
+    
     st.divider()
     st.subheader(f"📊 {calc_comp}")
     m1, m2 = st.columns(2)
-    with m1: st.metric("Рекомендуемая доза", f"{rc} кап.", f"{e_rec:.2f}%")
-    with m2: st.metric("Максимум по IFRA", f"{mx} кап.", f"{e_ifra:.2f}%")
+    with m1: st.metric("Рекомендуемая доза", f"{rc} {unit_label}", f"{e_rec:.2f}%")
+    with m2: st.metric("Максимум по IFRA", f"{mx} {unit_label}", f"{e_ifra:.2f}%")
 
 # ==========================================
 # 👇 НИЗ: ЖУРНАЛ ТЕСТОВ
@@ -70,52 +93,64 @@ if "formula" not in st.session_state:
 if "saved_journal" not in st.session_state:
     st.session_state.saved_journal = None
 
+# ✅ ВЫБОР ЕДИНИЦ ДЛЯ ЖУРНАЛА
+journal_unit = st.radio("Единицы измерения", ["Капли", "Граммы"], horizontal=True, key="jour_unit")
+
 jv1, jv2 = st.columns(2)
-with jv1: j_conc_drops = st.slider("Капель концентрата", 1, 100, 30, key="jcd")
-with jv2: j_alc_drops = st.slider("Капель спирта", 0, 200, 30, key="jad")
-j_total = j_conc_drops + j_alc_drops
-st.caption(f"Готовый продукт: **{j_total} капель**")
+with jv1:
+    if journal_unit == "Капли":
+        j_conc = st.slider("Концентрат (кап.)", 1, 100, 30, key="jcd")
+    else:
+        j_conc = st.number_input("Концентрат (г)", min_value=0.01, step=0.01, value=1.0, format="%.2f", key="jcg")
+with jv2:
+    if journal_unit == "Капли":
+        j_alc = st.slider("Спирт (кап.)", 0, 200, 30, key="jad")
+    else:
+        j_alc = st.number_input("Спирт (г)", min_value=0.0, step=0.01, value=1.0, format="%.2f", key="jag")
+
+j_total = j_conc + j_alc
+ju_label = "капель" if journal_unit == "Капли" else "г"
+st.caption(f"Готовый продукт: **{j_total:.2f} {ju_label}**")
 
 st.subheader("🧪 Добавить ингредиент")
 a1, a2, a3, a4 = st.columns([2,2,1,1])
 with a1: j_comp = st.selectbox("Компонент", list(COMPONENTS.keys()), key="jcomp")
 with a2: j_concentration = st.selectbox("Концентрация (%)", [100,50,30,20,10,5,2,1], index=0, key="jconc")
-with a3: j_drops = st.number_input("Капель", min_value=1, step=1, value=1, key="jdr")
+with a3:
+    if journal_unit == "Капли":
+        j_amount = st.number_input("Капель", min_value=1, step=1, value=1, key="jdr")
+    else:
+        j_amount = st.number_input("Граммов", min_value=0.001, step=0.001, value=0.03, format="%.3f", key="jgr")
 with a4: add_btn = st.button("➕ Добавить", use_container_width=True, key="jbtn")
 
 if add_btn:
     lbl = f"{j_comp} ({j_concentration}%)" if j_concentration < 100 else f"{j_comp} (чистый)"
     st.session_state.formula.append({
         "label": lbl, 
-        "drops": int(j_drops),
+        "amount": float(j_amount),
         "comp_name": j_comp,
-        "concentration": j_concentration
+        "concentration": j_concentration,
+        "unit": journal_unit
     })
     st.rerun()
 
 if st.session_state.formula:
     st.divider()
-    total_ing = sum(i["drops"] for i in st.session_state.formula)
+    total_ing = sum(i["amount"] for i in st.session_state.formula)
     
-    # ✅ ИСПРАВЛЕННЫЙ РАСЧЁТ (ПРОВЕРЕНО ДЛЯ ЛЮБОГО СООТНОШЕНИЯ)
     rows = []
     has_violation = False
     total_real_oil = 0
     
-    # j_total = j_conc_drops + j_alc_drops (уже посчитано выше!)
-    # Для 30+20 = 50. Для 30+30 = 60. Всё верно.
-    
     for idx, i in enumerate(st.session_state.formula):
-        # % компонента ВНУТРИ концентрата (без учёта спирта)
-        pc = round((i["drops"] / total_ing) * 100, 2) if total_ing > 0 else 0
+        pc = round((i["amount"]/total_ing)*100, 2) if total_ing > 0 else 0
         
-        # ✅ Реальное чистое масло в каплях
-        real_oil_drops = i["drops"] * (i["concentration"] / 100.0)
-        total_real_oil += real_oil_drops
+        # ✅ Реальное чистое масло
+        real_oil = i["amount"] * (i["concentration"] / 100.0)
+        total_real_oil += real_oil
         
-        # ✅ % АКТИВНОГО В ГОТОВОМ = (реальное масло / общий объём с спиртом) * 100
-        # Именно эта формула работает для ЛЮБОГО соотношения!
-        active_pct_in_final = round((real_oil_drops / j_total) * 100, 3) if j_total > 0 else 0
+        # ✅ % активного в готовом (работает и для капель, и для граммов!)
+        active_pct_in_final = round((real_oil / j_total) * 100, 3) if j_total > 0 else 0
         
         comp_data = COMPONENTS.get(i["comp_name"], {})
         ifra_limit = comp_data.get("ifra_limit", 100.0)
@@ -127,8 +162,8 @@ if st.session_state.formula:
         
         rows.append({
             "Компонент": i["label"], 
-            "Капли": i["drops"],
-            "Реальное масло (кап.)": round(real_oil_drops, 2),
+            ju_label.capitalize(): i["amount"],
+            "Реальное масло": round(real_oil, 3),
             "% конц.": pc, 
             "% актив. в готов.": active_pct_in_final,
             "IFRA": status
@@ -136,7 +171,7 @@ if st.session_state.formula:
     
     df = pd.DataFrame(rows)
     
-    # ✅ КОПИРОВАНИЕ В ОДИН КЛИК
+    # ✅ КОПИРОВАНИЕ
     copy_text = df.to_csv(sep='\t', index=False)
     st.components.v1.html(f"""
         <button onclick="navigator.clipboard.writeText(`{copy_text}`);this.innerText='✅ Скопировано!';setTimeout(()=>this.innerText='📋 Скопировать таблицу',2000);"
@@ -151,25 +186,22 @@ if st.session_state.formula:
     
     st.dataframe(df.style.apply(highlight_violation, axis=1), use_container_width=True, hide_index=True)
     
-    # ✅ ИТОГОВАЯ СТАТИСТИКА ПО РЕАЛЬНОМУ МАСЛУ
-    real_oil_pct_in_conc = round((total_real_oil / total_ing) * 100, 1) if total_ing > 0 else 0
-    real_oil_pct_in_final = round((total_real_oil / j_total) * 100, 1) if j_total > 0 else 0
+    # ✅ ИТОГОВАЯ СТАТИСТИКА
+    real_oil_pct_conc = round((total_real_oil / total_ing) * 100, 1) if total_ing > 0 else 0
+    real_oil_pct_final = round((total_real_oil / j_total) * 100, 1) if j_total > 0 else 0
     
-    stat_col1, stat_col2, stat_col3 = st.columns(3)
-    with stat_col1:
-        st.metric("Всего капель", f"{total_ing}")
-    with stat_col2:
-        st.metric("Реальное масло", f"{round(total_real_oil, 1)} кап.", f"{real_oil_pct_in_conc}% в концентрате")
-    with stat_col3:
-        st.metric("Итоговая концентрация", f"{real_oil_pct_in_final}%", "в готовом продукте")
+    s1, s2, s3 = st.columns(3)
+    with s1: st.metric(f"Всего {ju_label}", f"{total_ing:.2f}")
+    with s2: st.metric("Реальное масло", f"{total_real_oil:.2f}", f"{real_oil_pct_conc}% в концентрате")
+    with s3: st.metric("Итоговая концентрация", f"{real_oil_pct_final}%", "в готовом продукте")
     
     if has_violation:
-        st.error("🙀 ВНИМАНИЕ: Превышение лимитов IFRA!")
+        st.error("🙀🙀🙀 ВНИМАНИЕ: Превышение лимитов IFRA!")
     
-    if abs(total_ing - j_conc_drops) > 0:
-        st.warning(f"⚠️ Сумма ингредиентов ({total_ing}) ≠ концентрату ({j_conc_drops})")
+    if abs(total_ing - j_conc) > 0.01:
+        st.warning(f"⚠️ Сумма ингредиентов ({total_ing:.2f}) ≠ концентрату ({j_conc:.2f})")
 
-    # ✅ УДАЛЕНИЕ ИНГРЕДИЕНТОВ
+    # ✅ УДАЛЕНИЕ
     st.subheader("🗑️ Управление")
     del_cols = st.columns(min(len(st.session_state.formula), 6))
     for idx, item in enumerate(st.session_state.formula):
@@ -188,13 +220,12 @@ if st.session_state.formula:
         if tname.strip():
             jr = []
             for i in st.session_state.formula:
-                pc = round((i["drops"]/total_ing)*100, 2) if total_ing > 0 else 0
-                pf = round((i["drops"]/j_total)*100, 3) if j_total > 0 else 0
-                real_oil = round(i["drops"] * (i["concentration"] / 100.0), 2)
+                pc = round((i["amount"]/total_ing)*100, 2) if total_ing > 0 else 0
+                pf = round((i["amount"]/j_total)*100, 3) if j_total > 0 else 0
+                real_oil = round(i["amount"] * (i["concentration"] / 100.0), 3)
                 jr.append({"Название": tname, "Дата": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                           "Компонент": i["label"], "Капли": i["drops"], 
-                           "Реальное масло": real_oil,
-                           "% конц.": pc, "% готов.": pf})
+                           "Компонент": i["label"], ju_label.capitalize(): i["amount"],
+                           "Реальное масло": real_oil, "% конц.": pc, "% готов.": pf})
             st.session_state.saved_journal = pd.DataFrame(jr)
             st.success(f"✅ '{tname}' сохранён!")
         else:
