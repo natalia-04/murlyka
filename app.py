@@ -28,8 +28,8 @@ COMPONENTS = {
     "Bacdanol® TOCO (IFF)": {"ifra_limit": 100.0, "rec_dose": 5.0}
 }
 
-st.set_page_config(page_title="Murlyka Lab", page_icon="🐱", layout="wide")
-st.title("🐱 Murlyka Lab")
+st.set_page_config(page_title="Murlyka Lab", page_icon="😺", layout="wide")
+st.title("😺 Murlyka Lab")
 
 # ==========================================
 # 🔝 ВЕРХ: КАЛЬКУЛЯТОР БЕЗОПАСНОСТИ
@@ -81,18 +81,17 @@ a1, a2, a3, a4, a5 = st.columns([2, 1, 1, 1, 1])
 with a1: j_comp = st.selectbox("Компонент", list(COMPONENTS.keys()), key="jcomp")
 with a2: j_concentration = st.selectbox("Конц. %", [100,50,30,20,10,5,2,1], index=0, key="jconc")
 with a3: j_grams = st.number_input("Граммы", min_value=0.001, step=0.001, value=0.030, format="%.3f", key="jgr")
-# ✅ НОВОЕ ПОЛЕ: Капли справочно (НЕ участвует в расчётах!)
 with a4: j_drops_ref = st.number_input("Капли (справ.)", min_value=0, step=1, value=0, key="jdr_ref")
 with a5: add_btn = st.button("➕", use_container_width=True, key="jbtn")
 
 if add_btn and j_grams > 0:
-    lbl = f"{j_comp} ({j_concentration}%)" if j_concentration < 100 else f"{j_comp} (чистый)"
+    # ✅ НАЗВАНИЕ ТЕПЕРЬ ЧИСТОЕ, БЕЗ СКОБОК С КОНЦЕНТРАЦИЕЙ
     st.session_state.formula.append({
-        "label": lbl,
+        "label": j_comp,  # Только название!
+        "concentration": j_concentration,  # Отдельное поле
         "grams": float(j_grams),
-        "drops_ref": int(j_drops_ref),  # ✅ Только для отображения!
-        "comp_name": j_comp,
-        "concentration": j_concentration
+        "drops_ref": int(j_drops_ref),
+        "comp_name": j_comp
     })
     st.rerun()
 
@@ -115,14 +114,15 @@ if st.session_state.formula:
 
         status = "✅"
         if ifra_limit < 100.0 and active_pct_in_final > ifra_limit:
-            status = "ПРЕВЫШЕНИЕ!🙀🙀🙀"
+            status = "ПРЕВЫШЕНИЕ! 🙀🙀🙀"
             has_violation = True
 
         rows.append({
-            "Компонент": i["label"],
+            "Компонент": i["label"],           # Чистое название для VLOOKUP
+            "Конц. %": i["concentration"],     # Отдельный столбец
+            "Капли (справ.)": i["drops_ref"] if i["drops_ref"] > 0 else "—",
             "Граммы": i["grams"],
-            "Капли (справ.)": i["drops_ref"] if i["drops_ref"] > 0 else "—",  # ✅ Отображение
-            "Чистое в-во (г)": round(real_oil, 3),
+            "Масло (г)": round(real_oil, 3),
             "% конц.": pc,
             "% актив. готов.": active_pct_in_final,
             "IFRA": status
@@ -170,6 +170,15 @@ if st.session_state.formula:
             if st.button(f"❌ {short_label}", key=f"del_{idx}", use_container_width=True):
                 st.session_state.formula.pop(idx)
                 st.rerun()
+
+    if st.session_state.saved_journal is not None:
+        st.divider()
+        st.subheader("💾 Последний сохранённый тест")
+        st.dataframe(st.session_state.saved_journal, use_container_width=True, hide_index=True)
+        if st.button("🆕 Новый тест (очистить формулу)", use_container_width=True, key="new_test"):
+            st.session_state.formula = []
+            st.session_state.saved_journal = None
+            st.rerun()
 
 else:
     st.info("👆 Добавьте ингредиенты выше")
