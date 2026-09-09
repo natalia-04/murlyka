@@ -28,8 +28,8 @@ COMPONENTS = {
     "Bacdanol® TOCO (IFF)": {"ifra_limit": 100.0, "rec_dose": 5.0}
 }
 
-st.set_page_config(page_title="Murlyka Lab", page_icon="🐱", layout="wide")
-st.title("🐱 Murlyka Lab")
+st.set_page_config(page_title="Murlyka Lab", page_icon="😺", layout="wide")
+st.title("😺 Murlyka Lab")
 
 # ==========================================
 # 🔝 КАЛЬКУЛЯТОР БЕЗОПАСНОСТИ (ОБЩИЙ)
@@ -190,7 +190,7 @@ with tab_grams:
 
             status = "✅"
             if ifra_limit < 100.0 and active_pct_in_final > ifra_limit:
-                status = "🙀🙀🙀 ПРЕВЫШЕНИЕ!"
+                status = "ПРЕВЫШЕНИЕ! 🙀🙀🙀"
                 has_violation = True
 
             rows.append({
@@ -229,7 +229,7 @@ with tab_grams:
         with s3: st.metric("Итоговая концентрация", f"{real_oil_pct_final}%", "в готовом продукте")
 
         if has_violation:
-            st.error("🙀🙀🙀 ВНИМАНИЕ: Превышение лимитов IFRA!")
+            st.error("🙀 ВНИМАНИЕ: Превышение лимитов IFRA!")
 
         if abs(total_ing - j_conc) > 0.001:
             st.warning(f"⚠️ Сумма ингредиентов ({total_ing:.3f} г) ≠ концентрату ({j_conc:.2f} г)")
@@ -244,39 +244,6 @@ with tab_grams:
                     st.session_state.formula_grams.pop(idx)
                     st.rerun()
 
-        st.divider()
-        tname = st.text_input("Название теста", placeholder="Живой Лес v4.0", key="tn")
-
-        if st.button("💾 Сохранить", type="primary", use_container_width=True, key="sbtn", disabled=has_violation):
-            if tname.strip():
-                jr = []
-                for i in st.session_state.formula_grams:
-                    pc = round((i["grams"] / total_ing) * 100, 2) if total_ing > 0 else 0
-                    pf = round((i["grams"] / j_total) * 100, 3) if j_total > 0 else 0
-                    real_oil = round(i["grams"] * (i["concentration"] / 100.0), 3)
-                    jr.append({
-                        "Название": tname,
-                        "Дата": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                        "Компонент": i["label"],
-                        "Конц. %": i["concentration"],
-                        "Капли (справ.)": i["drops_ref"] if i["drops_ref"] > 0 else "—",
-                        "Граммы": i["grams"],
-                        "Масло (г)": real_oil,
-                        "% конц.": pc,
-                        "% готов.": pf
-                    })
-                st.session_state.saved_journal = pd.DataFrame(jr)
-                st.success(f"✅ '{tname}' сохранён!")
-            else:
-                st.warning("⚠️ Введите название!")
-
-        if st.session_state.saved_journal is not None:
-            st.divider()
-            st.subheader("💾 Последний сохранённый тест")
-            st.dataframe(st.session_state.saved_journal, use_container_width=True, hide_index=True)
-            if st.button("🆕 Новый тест (очистить формулу)", use_container_width=True, key="new_test"):
-                st.session_state.formula_grams = []
-                st.session_state.saved_journal = None
-                st.rerun()
+        
     else:
         st.info("👆 Добавьте ингредиенты выше")
