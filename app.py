@@ -157,7 +157,7 @@ if st.session_state.formula:
         
         status = "✅"
         if ifra_limit < 100.0 and active_pct_in_final > ifra_limit:
-            status = "🙀🙀🙀 ПРЕВЫШЕНИЕ!"
+            status = "ПРЕВЫШЕНИЕ! 🙀🙀🙀"
             has_violation = True
         
         rows.append({
@@ -196,7 +196,7 @@ if st.session_state.formula:
     with s3: st.metric("Итоговая концентрация", f"{real_oil_pct_final}%", "в готовом продукте")
     
     if has_violation:
-        st.error("🙀🙀🙀 ВНИМАНИЕ: Превышение лимитов IFRA!")
+        st.error("🙀 ВНИМАНИЕ: Превышение лимитов IFRA!")
     
     if abs(total_ing - j_conc) > 0.01:
         st.warning(f"⚠️ Сумма ингредиентов ({total_ing:.2f}) ≠ концентрату ({j_conc:.2f})")
@@ -211,34 +211,6 @@ if st.session_state.formula:
             if st.button(f"❌ {short_label}", key=f"del_{idx}", use_container_width=True):
                 st.session_state.formula.pop(idx)
                 st.rerun()
-
-    # ✅ СОХРАНЕНИЕ
-    st.divider()
-    tname = st.text_input("Название теста", placeholder="Живой Лес v4.0", key="tn")
-    
-    if st.button("💾 Сохранить", type="primary", use_container_width=True, key="sbtn", disabled=has_violation):
-        if tname.strip():
-            jr = []
-            for i in st.session_state.formula:
-                pc = round((i["amount"]/total_ing)*100, 2) if total_ing > 0 else 0
-                pf = round((i["amount"]/j_total)*100, 3) if j_total > 0 else 0
-                real_oil = round(i["amount"] * (i["concentration"] / 100.0), 3)
-                jr.append({"Название": tname, "Дата": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                           "Компонент": i["label"], ju_label.capitalize(): i["amount"],
-                           "Реальное масло": real_oil, "% конц.": pc, "% готов.": pf})
-            st.session_state.saved_journal = pd.DataFrame(jr)
-            st.success(f"✅ '{tname}' сохранён!")
-        else:
-            st.warning("⚠️ Введите название!")
-    
-    if st.session_state.saved_journal is not None:
-        st.divider()
-        st.subheader("💾 Последний сохранённый тест")
-        st.dataframe(st.session_state.saved_journal, use_container_width=True, hide_index=True)
-        if st.button("🆕 Новый тест (очистить формулу)", use_container_width=True, key="new_test"):
-            st.session_state.formula = []
-            st.session_state.saved_journal = None
-            st.rerun()
 
 else:
     st.info("👆 Добавьте ингредиенты выше")
