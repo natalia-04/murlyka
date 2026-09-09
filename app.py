@@ -115,14 +115,14 @@ if st.session_state.formula:
 
         status = "✅"
         if ifra_limit < 100.0 and active_pct_in_final > ifra_limit:
-            status = "🙀🙀🙀 ПРЕВЫШЕНИЕ!"
+            status = "ПРЕВЫШЕНИЕ!🙀🙀🙀"
             has_violation = True
 
         rows.append({
             "Компонент": i["label"],
             "Граммы": i["grams"],
             "Капли (справ.)": i["drops_ref"] if i["drops_ref"] > 0 else "—",  # ✅ Отображение
-            "Масло (г)": round(real_oil, 3),
+            "Чистое в-во (г)": round(real_oil, 3),
             "% конц.": pc,
             "% актив. готов.": active_pct_in_final,
             "IFRA": status
@@ -155,7 +155,7 @@ if st.session_state.formula:
     with s3: st.metric("Итоговая концентрация", f"{real_oil_pct_final}%", "в готовом продукте")
 
     if has_violation:
-        st.error("🙀🙀🙀 ВНИМАНИЕ: Превышение лимитов IFRA!")
+        st.error("🙀 ВНИМАНИЕ: Превышение лимитов IFRA!")
 
     if abs(total_ing - j_conc) > 0.001:
         st.warning(f"⚠️ Сумма ингредиентов ({total_ing:.3f} г) ≠ концентрату ({j_conc:.2f} г)")
