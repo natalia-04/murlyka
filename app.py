@@ -90,77 +90,137 @@ st.divider()
 # ==========================================
 tab_drops, tab_grams = st.tabs(["💧 Капли (To Do)", "⚖️ Граммы (Замес)"])
 
-# === ВКЛАДКА 1: КАПЛИ (TO DO) ===
+# === ВКЛАДКА 1: КАПЛИ (TO DO) - ЖИВОЙ ЧЕРНОВИК ===
 with tab_drops:
-    st.header("📝 Черновик в каплях")
-    st.caption("Придумывай свободно. IFRA проверяется по объёмным %.")
+    st.header("😺 Черновик в каплях")
+    st.caption("Меняй капли концентрата/спирта — проценты пересчитаются автоматически. Редактируй ингредиенты на лету.")
 
     if "formula_drops" not in st.session_state:
         st.session_state.formula_drops = []
 
-    # ✅ ПРОСТО: капли концентрата и капли спирта
+    # ✅ ПАРАМЕТРЫ СМЕСИ (пересчёт происходит мгновенно при изменении)
     dc1, dc2 = st.columns(2)
-    with dc1: total_conc_drops = st.number_input("Капли концентрата (всего)", min_value=1, value=30, step=1, key="tcd")
-    with dc2: total_alc_drops = st.number_input("Капли спирта", min_value=0, value=30, step=1, key="tad")
+    with dc1: 
+        total_conc_drops = st.number_input(
+            "Капли концентрата (всего)", 
+            min_value=1, value=30, step=1, key="tcd"
+        )
+    with dc2: 
+        total_alc_drops = st.number_input(
+            "Капли спирта", 
+            min_value=0, value=30, step=1, key="tad"
+        )
     
     total_mixture_drops = total_conc_drops + total_alc_drops
     st.caption(f"Всего в смеси: **{total_mixture_drops} капель**")
 
+    # ✅ ДОБАВЛЕНИЕ НОВОГО ИНГРЕДИЕНТА
+    st.subheader("➕ Добавить компонент")
     a1, a2, a3, a4 = st.columns([2, 1, 1, 1])
     with a1: d_comp = st.selectbox("Компонент", list(COMPONENTS.keys()), key="d_comp")
     with a2: d_conc = st.selectbox("Конц. %", [100,50,30,20,10,5,2,1], index=0, key="d_conc")
-    with a3: d_drops = st.number_input("Капли компонента", min_value=0, step=1, value=1, key="d_drops")
-    with a4: d_add = st.button("➕ Добавить", use_container_width=True, key="d_btn")
+    with a3: d_drops = st.number_input("Капли", min_value=0, step=1, value=1, key="d_drops")
+    with a4: d_add = st.button("Добавить", use_container_width=True, key="d_btn")
 
     if d_add and d_drops > 0:
-        # ✅ ПРАВИЛЬНЫЙ РАСЧЁТ: чистое вещество / ВСЯ СМЕСЬ (концентрат + спирт)
-        # Предполагаем, что капля концентрата и капля спирта ≈ равны по объёму для черновика
-        pure_drops = d_drops * (d_conc / 100.0)
-        real_oil_pct = round((pure_drops / total_mixture_drops) * 100, 2) if total_mixture_drops > 0 else 0
-        
-        comp_data = COMPONENTS.get(d_comp, {})
-        ifra_limit = comp_data.get("ifra_limit", 100.0)
-        
-        status = "✅"
-        if ifra_limit < 100.0 and real_oil_pct > ifra_limit:
-            status = "🙀🙀🙀"
-
         st.session_state.formula_drops.append({
-            "Компонент": d_comp,
-            "Конц. %": d_conc,
-            "Капли": d_drops,
-            "% актив. (объёмн.)": real_oil_pct,
-            "IFRA": status
+            "comp": d_comp,
+            "conc": d_conc,
+            "drops": d_drops
         })
         st.rerun()
 
+    # ✅ ТАБЛИЦА С РЕДАКТИРУЕМЫМИ ПОЛЯМИ
     if st.session_state.formula_drops:
-        df_drops = pd.DataFrame(st.session_state.formula_drops)
+        st.divider()
+        st.subheader("📝 Ингредиенты (редактируемые)")
         
-        def highlight_violation_drops(row):
-            if "🙀" in str(row["IFRA"]):
-                return ["background-color: #ffcccc"] * len(row)
-            return [""] * len(row)
+        rows_to_delete = []
+        for idx, item in enumerate(st.session_state.formula_drops):
+            cols = st.columns([3, 1, 1, 1, 1])
+            
+            # Название (только чтение)
+            with cols[0]:
+                st.text(item["comp"])
+            
+            # Концентрация (редактируемая)
+            with cols[1]:
+                new_conc = st.selectbox(
+                    "%", 
+                    [100,50,30,20,10,5,2,1], 
+                    index=[100,50,30,20,10,5,2,1].index(item["conc"]),
+                    key=f"dc_{idx}",
+                    label_visibility="collapsed"
+                )
+            
+            # Капли (редактируемые)
+            with cols[2]:
+                new_drops = st.number_input(
+                    "Кап.", 
+                    min_value=0, step=1, value=item["drops"],
+                    key=f"dd_{idx}",
+                    label_visibility="collapsed"
+                )
+            
+            # Расчёт % актив. и статуса IFRA (динамический!)
+            vol_pct_in_mix = (new_drops / total_mixture_drops) * 100 if total_mixture_drops > 0 else 0
+            real_oil_pct = round(vol_pct_in_mix * (new_conc / 100.0), 2)
+            
+            comp_data = COMPONENTS.get(item["comp"], {})
+            ifra_limit = comp_data.get("ifra_limit", 100.0)
+            status = "✅" if (ifra_limit >= 100.0 or real_oil_pct <= ifra_limit) else "🙀🙀🙀"
+            
+            # Показываем % и статус
+            with cols[3]:
+                color = "#ffcccc" if status == "🙀🙀🙀" else "#e8f5e9"
+                st.markdown(
+                    f"<div style='background:{color};padding:6px;border-radius:4px;text-align:center;'>{real_oil_pct}%</div>",
+                    unsafe_allow_html=True
+                )
+            with cols[4]:
+                st.markdown(f"**{status}**")
+            
+            # Обновляем данные в session_state при изменении
+            if new_conc != item["conc"] or new_drops != item["drops"]:
+                st.session_state.formula_drops[idx]["conc"] = new_conc
+                st.session_state.formula_drops[idx]["drops"] = new_drops
+                st.rerun()
+            
+            # Кнопка удаления (компактная)
+            if st.button("❌", key=f"del_d_{idx}"):
+                rows_to_delete.append(idx)
+        
+        # Удаляем помеченные строки
+        if rows_to_delete:
+            for idx in sorted(rows_to_delete, reverse=True):
+                st.session_state.formula_drops.pop(idx)
+            st.rerun()
 
-        st.dataframe(df_drops.style.apply(highlight_violation_drops, axis=1), use_container_width=True, hide_index=True)
-
-        copy_drops = df_drops.to_csv(sep='\t', index=False)
+        # ✅ КОПИРОВАНИЕ TO DO
+        st.divider()
+        copy_rows = []
+        for item in st.session_state.formula_drops:
+            vol_pct = (item["drops"] / total_mixture_drops) * 100 if total_mixture_drops > 0 else 0
+            real_pct = round(vol_pct * (item["conc"] / 100.0), 2)
+            limit = COMPONENTS.get(item["comp"], {}).get("ifra_limit", 100.0)
+            stat = "✅" if (limit >= 100.0 or real_pct <= limit) else "🙀🙀🙀"
+            copy_rows.append({
+                "Компонент": item["comp"],
+                "Конц. %": item["conc"],
+                "Капли": item["drops"],
+                "% актив.": real_pct,
+                "IFRA": stat
+            })
+        
+        df_copy = pd.DataFrame(copy_rows)
+        copy_csv = df_copy.to_csv(sep='\t', index=False)
         st.components.v1.html(f"""
-            <button onclick="navigator.clipboard.writeText(`{copy_drops}`);this.innerText='✅ Скопировано!';setTimeout(()=>this.innerText='📋 Скопировать To Do',2000);"
-            style="width:100%;padding:8px;border:none;border-radius:6px;background:#4CAF50;color:white;font-size:14px;cursor:pointer;margin-top:10px;">
+            <button onclick="navigator.clipboard.writeText(`{copy_csv}`);this.innerText='✅ Скопировано!';setTimeout(()=>this.innerText='📋 Скопировать To Do',2000);"
+            style="width:100%;padding:8px;border:none;border-radius:6px;background:#4CAF50;color:white;font-size:14px;cursor:pointer;">
             📋 Скопировать To Do</button>
         """, height=45)
 
-        del_cols = st.columns(min(len(st.session_state.formula_drops), 6))
-        for idx, item in enumerate(st.session_state.formula_drops):
-            col_idx = idx % 6
-            with del_cols[col_idx]:
-                short = item['Компонент'][:10] + ".." if len(item['Компонент']) > 10 else item['Компонент']
-                if st.button(f"❌ {short}", key=f"del_d_{idx}", use_container_width=True):
-                    st.session_state.formula_drops.pop(idx)
-                    st.rerun()
-
-        if st.button("🆕 Очистить To Do", use_container_width=True, key="clear_drops"):
+        if st.button("🆕 Очистить весь черновик", use_container_width=True, key="clear_drops"):
             st.session_state.formula_drops = []
             st.rerun()
     else:
