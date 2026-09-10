@@ -93,15 +93,32 @@ tab_drops, tab_grams = st.tabs(["💧 Капли (To Do)", "⚖️ Граммы 
 # === ВКЛАДКА 1: КАПЛИ (TO DO) ===
 with tab_drops:
     st.header("📝 Черновик в каплях")
-    st.caption("Придумывай свободно. IFRA проверяется по объёмным %.")
+    st.caption("Меняй капли концентрата/спирта — проценты и IFRA пересчитаются автоматически.")
 
     if "formula_drops" not in st.session_state:
         st.session_state.formula_drops = []
 
-    # ✅ ПРОСТО: капли концентрата и капли спирта
+    # ✅ ЖИВЫЕ ПОЛЯ: изменение мгновенно обновляет всю таблицу
     dc1, dc2 = st.columns(2)
-    with dc1: total_conc_drops = st.number_input("Капли концентрата (всего)", min_value=1, value=30, step=1, key="tcd")
-    with dc2: total_alc_drops = st.number_input("Капли спирта", min_value=0, value=30, step=1, key="tad")
+    with dc1: 
+        total_conc_drops = st.number_input(
+            "Капли концентрата (всего)", 
+            min_value=1, 
+            value=st.session_state.get("tcd_val", 30), 
+            step=1, 
+            key="tcd"
+        )
+        st.session_state.tcd_val = total_conc_drops
+        
+    with dc2: 
+        total_alc_drops = st.number_input(
+            "Капли спирта", 
+            min_value=0, 
+            value=st.session_state.get("tad_val", 30), 
+            step=1, 
+            key="tad"
+        )
+        st.session_state.tad_val = total_alc_drops
     
     total_mixture_drops = total_conc_drops + total_alc_drops
     st.caption(f"Всего в смеси: **{total_mixture_drops} капель**")
@@ -113,29 +130,36 @@ with tab_drops:
     with a4: d_add = st.button("➕ Добавить", use_container_width=True, key="d_btn")
 
     if d_add and d_drops > 0:
-        # ✅ ПРАВИЛЬНЫЙ РАСЧЁТ: чистое вещество / ВСЯ СМЕСЬ (концентрат + спирт)
-        # Предполагаем, что капля концентрата и капля спирта ≈ равны по объёму для черновика
-        pure_drops = d_drops * (d_conc / 100.0)
-        real_oil_pct = round((pure_drops / total_mixture_drops) * 100, 2) if total_mixture_drops > 0 else 0
-        
-        comp_data = COMPONENTS.get(d_comp, {})
-        ifra_limit = comp_data.get("ifra_limit", 100.0)
-        
-        status = "✅"
-        if ifra_limit < 100.0 and real_oil_pct > ifra_limit:
-            status = "🙀🙀🙀"
-
         st.session_state.formula_drops.append({
             "Компонент": d_comp,
             "Конц. %": d_conc,
-            "Капли": d_drops,
-            "% актив. (объёмн.)": real_oil_pct,
-            "IFRA": status
+            "Капли": d_drops
         })
         st.rerun()
 
+    # ✅ ДИНАМИЧЕСКИЙ ПЕРЕСЧЁТ: таблица строится заново при каждом изменении полей
     if st.session_state.formula_drops:
-        df_drops = pd.DataFrame(st.session_state.formula_drops)
+        rows = []
+        for item in st.session_state.formula_drops:
+            vol_pct_in_mix = (item["Капли"] / total_mixture_drops) * 100 if total_mixture_drops > 0 else 0
+            real_oil_pct = round(vol_pct_in_mix * (item["Конц. %"] / 100.0), 2)
+            
+            comp_data = COMPONENTS.get(item["Компонент"], {})
+            ifra_limit = comp_data.get("ifra_limit", 100.0)
+            
+            status = "✅"
+            if ifra_limit < 100.0 and real_oil_pct > ifra_limit:
+                status = "🙀🙀🙀"
+
+            rows.append({
+                "Компонент": item["Компонент"],
+                "Конц. %": item["Конц. %"],
+                "Капли": item["Капли"],
+                "% актив. (объёмн.)": real_oil_pct,
+                "IFRA": status
+            })
+
+        df_drops = pd.DataFrame(rows)
         
         def highlight_violation_drops(row):
             if "🙀" in str(row["IFRA"]):
