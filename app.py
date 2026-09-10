@@ -32,14 +32,25 @@ st.set_page_config(page_title="Murlyka Lab", page_icon="😺", layout="wide")
 st.title("😺 Murlyka Lab")
 
 # ==========================================
-# 🔝 КАЛЬКУЛЯТОР БЕЗОПАСНОСТИ (ОБЩИЙ)
+# 🔝 КАЛЬКУЛЯТОР БЕЗОПАСНОСТИ (С КАПЛЯМИ!)
 # ==========================================
 st.header("🧪 Калькулятор Безопасности")
-cv1, cv2 = st.columns(2)
-with cv1: calc_conc = st.slider("Концентрат (г)", 0.01, 50.0, 1.0, step=0.01, format="%.2f", key="ccg")
-with cv2: calc_alc = st.slider("Спирт (г)", 0.0, 100.0, 1.0, step=0.01, format="%.2f", key="cag")
-calc_total = calc_conc + calc_alc
-st.caption(f"Готовый продукт: **{calc_total:.2f} г**")
+
+# Переключатель единиц
+unit_mode = st.radio("Единицы:", ["💧 Капли", "⚖️ Граммы"], horizontal=True, key="calc_unit")
+
+if unit_mode == "💧 Капли":
+    cv1, cv2 = st.columns(2)
+    with cv1: calc_conc_drops = st.number_input("Капли концентрата", min_value=1, value=30, step=1, key="ccd")
+    with cv2: calc_alc_drops = st.number_input("Капли спирта", min_value=0, value=30, step=1, key="cad")
+    calc_total_drops = calc_conc_drops + calc_alc_drops
+    st.caption(f"Всего в смеси: **{calc_total_drops} капель**")
+else:
+    cv1, cv2 = st.columns(2)
+    with cv1: calc_conc = st.slider("Концентрат (г)", 0.01, 50.0, 1.0, step=0.01, format="%.2f", key="ccg")
+    with cv2: calc_alc = st.slider("Спирт (г)", 0.0, 100.0, 1.0, step=0.01, format="%.2f", key="cag")
+    calc_total = calc_conc + calc_alc
+    st.caption(f"Готовый продукт: **{calc_total:.2f} г**")
 
 cc1, cc2 = st.columns(2)
 with cc1: calc_comp = st.selectbox("Компонент", list(COMPONENTS.keys()), key="ccomp")
@@ -48,15 +59,34 @@ with cc2: calc_concentration = st.selectbox("Концентрация (%)", [100
 if st.button("Рассчитать!", type="primary", use_container_width=True, key="cbtn"):
     d = COMPONENTS[calc_comp]
     cf = calc_concentration / 100.0
-    e_ifra = 100.0 if d["ifra_limit"] == 100.0 else d["ifra_limit"] / cf
-    e_rec = d["rec_dose"] / cf
-    mx = round(calc_total * e_ifra / 100, 3)
-    rc = round(calc_total * e_rec / 100, 3)
-    st.divider()
-    st.subheader(f"📊 {calc_comp}")
-    m1, m2 = st.columns(2)
-    with m1: st.metric("Рекомендуемая доза", f"{rc} г", f"{e_rec:.2f}%")
-    with m2: st.metric("Максимум по IFRA", f"{mx} г", f"{e_ifra:.2f}%")
+    
+    if unit_mode == "💧 Капли":
+        # Для капель: объёмный % активного вещества
+        vol_pct = (1 / calc_total_drops) * 100 if calc_total_drops > 0 else 0  # % одной капли
+        real_oil_pct = round(vol_pct * cf, 2)
+        
+        status = "✅"
+        if d["ifra_limit"] < 100.0 and real_oil_pct > d["ifra_limit"]:
+            status = "🙀🙀🙀"
+        
+        st.divider()
+        st.subheader(f"📊 {calc_comp} (в каплях)")
+        m1, m2 = st.columns(2)
+        with m1: st.metric("% актив. (объёмн.)", f"{real_oil_pct}%")
+        with m2: st.metric("Статус IFRA", status)
+        st.caption(f"Лимит: {d['ifra_limit']}% | 1 капля = {vol_pct:.2f}% от смеси")
+        
+    else:
+        # Для граммов: массовый % (старая логика)
+        e_ifra = 100.0 if d["ifra_limit"] == 100.0 else d["ifra_limit"] / cf
+        e_rec = d["rec_dose"] / cf
+        mx = round(calc_total * e_ifra / 100, 3)
+        rc = round(calc_total * e_rec / 100, 3)
+        st.divider()
+        st.subheader(f"📊 {calc_comp}")
+        m1, m2 = st.columns(2)
+        with m1: st.metric("Рекомендуемая доза", f"{rc} г", f"{e_rec:.2f}%")
+        with m2: st.metric("Максимум по IFRA", f"{mx} г", f"{e_ifra:.2f}%")
 
 st.divider()
 
