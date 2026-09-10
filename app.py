@@ -32,14 +32,13 @@ st.set_page_config(page_title="Murlyka Lab", page_icon="😺", layout="wide")
 st.title("😺 Murlyka Lab")
 
 # ==========================================
-# 🔝 КАЛЬКУЛЯТОР БЕЗОПАСНОСТИ (С КАПЛЯМИ!)
+# 🔝 КАЛЬКУЛЯТОР БЕЗОПАСНОСТИ (КАК БЫЛО)
 # ==========================================
 st.header("🧪 Калькулятор Безопасности")
 
-# Переключатель единиц
-unit_mode = st.radio("Единицы:", ["💧 Капли", "⚖️ Граммы"], horizontal=True, key="calc_unit")
+unit_mode = st.radio("Единицы:", ["💧 В каплях", "⚖️ В граммах"], horizontal=True, key="calc_unit")
 
-if unit_mode == "💧 Капли":
+if unit_mode == "💧 В каплях":
     cv1, cv2 = st.columns(2)
     with cv1: calc_conc_drops = st.number_input("Капли концентрата", min_value=1, value=30, step=1, key="ccd")
     with cv2: calc_alc_drops = st.number_input("Капли спирта", min_value=0, value=30, step=1, key="cad")
@@ -60,24 +59,20 @@ if st.button("Рассчитать!", type="primary", use_container_width=True, 
     d = COMPONENTS[calc_comp]
     cf = calc_concentration / 100.0
     
-    if unit_mode == "💧 Капли":
-        # Для капель: объёмный % активного вещества
-        vol_pct = (1 / calc_total_drops) * 100 if calc_total_drops > 0 else 0  # % одной капли
-        real_oil_pct = round(vol_pct * cf, 2)
-        
-        status = "✅"
-        if d["ifra_limit"] < 100.0 and real_oil_pct > d["ifra_limit"]:
-            status = "🙀🙀🙀"
+    if unit_mode == "💧 В каплях":
+        # Объёмный % лимита в смеси
+        max_vol_pct = d["ifra_limit"] / cf if cf > 0 else 0
+        # Сколько капель компонента можно добавить в эту смесь
+        safe_drops = round((max_vol_pct / 100) * calc_total_drops, 1)
         
         st.divider()
-        st.subheader(f"📊 {calc_comp} (в каплях)")
+        st.subheader(f"📊 {calc_comp}")
         m1, m2 = st.columns(2)
-        with m1: st.metric("% актив. (объёмн.)", f"{real_oil_pct}%")
-        with m2: st.metric("Статус IFRA", status)
-        st.caption(f"Лимит: {d['ifra_limit']}% | 1 капля = {vol_pct:.2f}% от смеси")
+        with m1: st.metric("Безопасно капель", f"≈ {safe_drops} кап.")
+        with m2: st.metric("Лимит IFRA", f"{d['ifra_limit']}%")
+        st.caption(f"Для смеси из {calc_conc_drops} кап. концентрата + {calc_alc_drops} кап. спирта")
         
     else:
-        # Для граммов: массовый % (старая логика)
         e_ifra = 100.0 if d["ifra_limit"] == 100.0 else d["ifra_limit"] / cf
         e_rec = d["rec_dose"] / cf
         mx = round(calc_total * e_ifra / 100, 3)
