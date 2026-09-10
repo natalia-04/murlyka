@@ -113,9 +113,10 @@ with tab_drops:
     with a4: d_add = st.button("➕ Добавить", use_container_width=True, key="d_btn")
 
     if d_add and d_drops > 0:
-        # ✅ % актив. = (капли_компонента / всего_смеси) * (концентрация / 100)
-        vol_pct_in_mix = (d_drops / total_mixture_drops) * 100 if total_mixture_drops > 0 else 0
-        real_oil_pct = round(vol_pct_in_mix * (d_conc / 100.0), 2)
+        # ✅ ПРАВИЛЬНЫЙ РАСЧЁТ: чистое вещество / ВСЯ СМЕСЬ (концентрат + спирт)
+        # Предполагаем, что капля концентрата и капля спирта ≈ равны по объёму для черновика
+        pure_drops = d_drops * (d_conc / 100.0)
+        real_oil_pct = round((pure_drops / total_mixture_drops) * 100, 2) if total_mixture_drops > 0 else 0
         
         comp_data = COMPONENTS.get(d_comp, {})
         ifra_limit = comp_data.get("ifra_limit", 100.0)
