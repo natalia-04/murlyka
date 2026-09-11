@@ -154,7 +154,7 @@ with tab_drops:
         st.info("👆 Добавь компоненты выше")
 
 
-# === ⚖️ ВКЛАДКА 2: ГРАММЫ (ЗАМЕС С ПРАВИЛЬНОЙ ФИЗИКОЙ) ===
+# === ⚖️ ВКЛАДКА 2: ГРАММЫ (ЗАМЕС С ПРАВИЛЬНОЙ ФИЗИКОЙ v2) ===
 with tab_grams:
     st.header("⚖️ Замес в граммах")
     st.caption("Взвесь компоненты → задай крепость → получи точную массу спирта.")
@@ -170,7 +170,7 @@ with tab_grams:
         options=[5, 10, 15, 20, 25, 30], value=15, key="tgt_str_g"
     )
 
-    # ➕ ДОБАВЛЕНИЕ ИНГРЕДИЕНТОВ
+    #  ДОБАВЛЕНИЕ ИНГРЕДИЕНТОВ
     a1, a2, a3, a4, a5 = st.columns([2, 1, 1, 1, 1])
     with a1: j_comp = st.selectbox("Компонент", list(COMPONENTS.keys()), key="jcomp")
     with a2: j_concentration = st.selectbox("Конц. %", [100,50,30,20,10,5,2,1], index=0, key="jconc")
@@ -196,18 +196,18 @@ with tab_grams:
         # ✅ ЧИСТОЕ МАСЛО = СУММА (ГРАММЫ × КОНЦЕНТРАЦИЯ)
         total_real_oil = sum(i["grams"] * (i["concentration"] / 100.0) for i in st.session_state.formula_grams)
         
-        # ⚖️ ПРАВИЛЬНЫЙ РАСЧЁТ СПИРТА (ЧЕРЕЗ ЧИСТОЕ МАСЛО!)
+        # ️ РАСЧЁТ СПИРТА (ЧЕРЕЗ ЧИСТОЕ МАСЛО!)
         mass_final_g = total_real_oil / (target_strength_g / 100.0) if target_strength_g > 0 else 0
         alcohol_needed_g = round(mass_final_g - total_ing, 3) if mass_final_g > total_ing else 0
         
         m1, m2, m3 = st.columns(3)
         with m1: st.metric("Масса концентрата", f"{total_ing:.3f} г", delta="авто-сумма")
-        with m2: st.metric("🍶 Нужно спирта", f"{alcohol_needed_g:.3f} г", delta=f"{target_strength_g}% EdP")
+        with m2: st.metric(" Нужно спирта", f"{alcohol_needed_g:.3f} г", delta=f"{target_strength_g}% EdP")
         with m3: st.metric("Масса готового", f"{mass_final_g:.3f} г")
 
         if alcohol_needed_g <= 0 and total_ing > 0:
             current_strength = round((total_real_oil / total_ing) * 100, 1) if total_ing > 0 else 0
-            st.warning(f"️ Смесь уже крепче {target_strength_g}%! Текущая концентрация масла: ~{current_strength}%")
+            st.warning(f"⚠️ Смесь уже крепче {target_strength_g}%! Текущая концентрация масла: ~{current_strength}%")
 
         st.divider()
 
@@ -218,7 +218,7 @@ with tab_grams:
             pc = round((i["grams"] / total_ing) * 100, 2) if total_ing > 0 else 0
             real_oil = i["grams"] * (i["concentration"] / 100.0)
             
-            # ✅ % АКТИВ. В ГОТОВОМ СЧИТАЕТСЯ ОТ МАССЫ ГОТОВОГО ПРОДУКТА
+            # ✅ % АКТИВ. В ГОТОВОМ СЧИТАЕТСЯ ОТ МАССЫ ГОТОВОГО ПРОДУКТА (НЕ КОНЦЕНТРАТА!)
             active_pct_in_final = round((real_oil / mass_final_g) * 100, 3) if mass_final_g > 0 else 0
 
             comp_data = COMPONENTS.get(i["comp_name"], {})
@@ -244,9 +244,9 @@ with tab_grams:
 
         copy_text = df.to_csv(sep='\t', index=False)
         st.components.v1.html(f"""
-            <button onclick="navigator.clipboard.writeText(`{copy_text}`);this.innerText='✅ Скопировано!';setTimeout(()=>this.innerText=' Скопировать таблицу',2000);"
+            <button onclick="navigator.clipboard.writeText(`{copy_text}`);this.innerText='✅ Скопировано!';setTimeout(()=>this.innerText='📋 Скопировать таблицу',2000);"
             style="width:100%;padding:10px;border:none;border-radius:6px;background:#ff4b4b;color:white;font-size:16px;cursor:pointer;">
-             Скопировать таблицу</button>
+            📋 Скопировать таблицу</button>
         """, height=50)
 
         def highlight_violation(row):
@@ -277,5 +277,43 @@ with tab_grams:
                 if st.button(f"❌ {short_label}", key=f"del_g_{idx}", use_container_width=True):
                     st.session_state.formula_grams.pop(idx)
                     st.rerun()
+
+        # 💾 СОХРАНЕНИЕ
+        st.divider()
+        tname = st.text_input("Название теста", placeholder="Живой Лес v4.0", key="tn")
+
+        if st.button("💾 Сохранить", type="primary", use_container_width=True, key="sbtn", disabled=has_violation):
+            if tname.strip():
+                jr = []
+                for i in st.session_state.formula_grams:
+                    pc = round((i["grams"] / total_ing) * 100, 2) if total_ing > 0 else 0
+                    pf = round((i["grams"] / mass_final_g) * 100, 3) if mass_final_g > 0 else 0
+                    real_oil = round(i["grams"] * (i["concentration"] / 100.0), 3)
+                    jr.append({
+                        "Название": tname,
+                        "Дата": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                        "Компонент": i["label"],
+                        "Конц. %": i["concentration"],
+                        "Капли (справ.)": i["drops_ref"] if i["drops_ref"] > 0 else "—",
+                        "Граммы": i["grams"],
+                        "Масло (г)": real_oil,
+                        "% конц.": pc,
+                        "% готов.": pf,
+                        "Крепость": f"{target_strength_g}%",
+                        "Спирт (г)": alcohol_needed_g
+                    })
+                st.session_state.saved_journal = pd.DataFrame(jr)
+                st.success(f"✅ '{tname}' сохранён!")
+            else:
+                st.warning("⚠️ Введите название!")
+
+        if st.session_state.saved_journal is not None:
+            st.divider()
+            st.subheader("💾 Последний сохранённый тест")
+            st.dataframe(st.session_state.saved_journal, use_container_width=True, hide_index=True)
+            if st.button(" Новый тест (очистить формулу)", use_container_width=True, key="new_test"):
+                st.session_state.formula_grams = []
+                st.session_state.saved_journal = None
+                st.rerun()
     else:
         st.info("👆 Добавьте ингредиенты выше")
