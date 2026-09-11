@@ -39,35 +39,6 @@ st.set_page_config(page_title="Murlyka Lab", page_icon="😺", layout="wide")
 st.title("😺 Murlyka Lab")
 
 # ==========================================
-# 🔝 КАЛЬКУЛЯТОР БЕЗОПАСНОСТИ (ГРАММЫ)
-# ==========================================
-st.header("🧪 Калькулятор Безопасности (Граммы)")
-cv1, cv2 = st.columns(2)
-with cv1: calc_conc = st.slider("Концентрат (г)", 0.01, 50.0, 1.0, step=0.01, format="%.2f", key="ccg")
-with cv2: calc_alc = st.slider("Спирт (г)", 0.0, 100.0, 1.0, step=0.01, format="%.2f", key="cag")
-calc_total = calc_conc + calc_alc
-st.caption(f"Готовый продукт: **{calc_total:.2f} г**")
-
-cc1, cc2 = st.columns(2)
-with cc1: calc_comp = st.selectbox("Компонент", list(COMPONENTS.keys()), key="ccomp")
-with cc2: calc_concentration = st.selectbox("Концентрация (%)", [100,50,30,20,10,5,2,1], index=0, key="cconc")
-
-if st.button("Рассчитать!", type="primary", use_container_width=True, key="cbtn"):
-    d = COMPONENTS[calc_comp]
-    cf = calc_concentration / 100.0
-    e_ifra = 100.0 if d["ifra_limit"] == 100.0 else d["ifra_limit"] / cf
-    e_rec = d["rec_dose"] / cf
-    mx = round(calc_total * e_ifra / 100, 3)
-    rc = round(calc_total * e_rec / 100, 3)
-    st.divider()
-    st.subheader(f"📊 {calc_comp}")
-    m1, m2 = st.columns(2)
-    with m1: st.metric("Рекомендуемая доза", f"{rc} г", f"{e_rec:.2f}%")
-    with m2: st.metric("Максимум по IFRA", f"{mx} г", f"{e_ifra:.2f}%")
-
-st.divider()
-
-# ==========================================
 # 👇 ЖУРНАЛ: ДВА РЕЖИМА
 # ==========================================
 tab_drops, tab_grams = st.tabs(["💧 Капли (Черновик)", "⚖️ Граммы (Замес)"])
@@ -183,22 +154,45 @@ with tab_drops:
         st.info("👆 Добавь компоненты выше")
 
 
-# === ⚖️ ВКЛАДКА 2: ГРАММЫ (ЗАМЕС) ===
+# === ⚖️ ВКЛАДКА 2: ГРАММЫ (ЗАМЕС С РАСЧЁТОМ СПИРТА) ===
 with tab_grams:
     st.header("⚖️ Замес в граммах")
-    st.caption("Точность. Безопасность. Экспорт в Google Таблицу.")
+    st.caption("Взвесь компоненты → задай крепость → получи точную массу спирта.")
 
     if "formula_grams" not in st.session_state:
         st.session_state.formula_grams = []
     if "saved_journal" not in st.session_state:
         st.session_state.saved_journal = None
 
-    jv1, jv2 = st.columns(2)
-    with jv1: j_conc = st.number_input("Концентрат (г)", min_value=0.01, step=0.01, value=1.0, format="%.2f", key="jcg")
-    with jv2: j_alc = st.number_input("Спирт (г)", min_value=0.0, step=0.01, value=1.0, format="%.2f", key="jag")
-    j_total = j_conc + j_alc
-    st.caption(f"Готовый продукт: **{j_total:.2f} г**")
+    # ✅ ЖЕЛАЕМАЯ КРЕПОСТЬ + МАССА КОНЦЕНТРАТА
+    gv1, gv2 = st.columns(2)
+    with gv1:
+        target_strength_g = st.select_slider(
+            "Желаемая крепость парфюма (%)",
+            options=[5, 10, 15, 20, 25, 30], value=15, key="tgt_str_g"
+        )
+    with gv2:
+        j_conc = st.number_input(
+            "Масса концентрата (г)", 
+            min_value=0.01, step=0.01, value=1.0, format="%.2f", key="jcg",
+            help="Сумма масс всех компонентов, которые ты уже взвесила"
+        )
+    
+    # ⚖️ РАСЧЁТ СПИРТА НА ОСНОВЕ РЕАЛЬНЫХ ГРАММОВ
+    mass_final_g = j_conc / (target_strength_g / 100.0) if target_strength_g > 0 else 0
+    alcohol_needed_g = round(mass_final_g - j_conc, 3) if mass_final_g > j_conc else 0
+    
+    m1, m2, m3 = st.columns(3)
+    with m1: st.metric("Масса готового продукта", f"{mass_final_g:.3f} г")
+    with m2: st.metric("🍶 Нужно спирта", f"{alcohol_needed_g:.3f} г", delta=f"{target_strength_g}% EdP")
+    with m3: st.metric("Масса концентрата", f"{j_conc:.2f} г")
 
+    if alcohol_needed_g <= 0 and j_conc > 0:
+        st.warning(f"⚠️ Смесь уже крепче {target_strength_g}%! Текущая крепость: ~{round((j_conc / mass_final_g) * 100, 1) if mass_final_g > 0 else 0}%")
+
+    st.divider()
+
+    # ➕ ДОБАВЛЕНИЕ ИНГРЕДИЕНТОВ
     a1, a2, a3, a4, a5 = st.columns([2, 1, 1, 1, 1])
     with a1: j_comp = st.selectbox("Компонент", list(COMPONENTS.keys()), key="jcomp")
     with a2: j_concentration = st.selectbox("Конц. %", [100,50,30,20,10,5,2,1], index=0, key="jconc")
@@ -216,6 +210,7 @@ with tab_grams:
         })
         st.rerun()
 
+    # 📊 ТАБЛИЦА И ПРОВЕРКИ
     if st.session_state.formula_grams:
         total_ing = sum(i["grams"] for i in st.session_state.formula_grams)
         rows = []
@@ -226,7 +221,8 @@ with tab_grams:
             pc = round((i["grams"] / total_ing) * 100, 2) if total_ing > 0 else 0
             real_oil = i["grams"] * (i["concentration"] / 100.0)
             total_real_oil += real_oil
-            active_pct_in_final = round((real_oil / j_total) * 100, 3) if j_total > 0 else 0
+            # ✅ % актив. считается от МАССЫ ГОТОВОГО (концентрат + спирт)
+            active_pct_in_final = round((real_oil / mass_final_g) * 100, 3) if mass_final_g > 0 else 0
 
             comp_data = COMPONENTS.get(i["comp_name"], {})
             ifra_limit = comp_data.get("ifra_limit", 100.0)
@@ -264,19 +260,20 @@ with tab_grams:
         st.dataframe(df.style.apply(highlight_violation, axis=1), use_container_width=True, hide_index=True)
 
         real_oil_pct_conc = round((total_real_oil / total_ing) * 100, 1) if total_ing > 0 else 0
-        real_oil_pct_final = round((total_real_oil / j_total) * 100, 1) if j_total > 0 else 0
+        real_oil_pct_final = round((total_real_oil / mass_final_g) * 100, 1) if mass_final_g > 0 else 0
 
         s1, s2, s3 = st.columns(3)
-        with s1: st.metric("Всего грамм", f"{total_ing:.3f}")
+        with s1: st.metric("Всего грамм (смесь)", f"{total_ing:.3f}")
         with s2: st.metric("Реальное масло", f"{total_real_oil:.3f} г", f"{real_oil_pct_conc}% в концентрате")
-        with s3: st.metric("Итоговая концентрация", f"{real_oil_pct_final}%", "в готовом продукте")
+        with s3: st.metric("Итоговая концентрация", f"{real_oil_pct_final}%", f"при {target_strength_g}% крепости")
 
         if has_violation:
             st.error("🙀🙀🙀 ВНИМАНИЕ: Превышение лимитов IFRA!")
 
         if abs(total_ing - j_conc) > 0.001:
-            st.warning(f"⚠️ Сумма ингредиентов ({total_ing:.3f} г) ≠ концентрату ({j_conc:.2f} г)")
+            st.warning(f"⚠️ Сумма ингредиентов ({total_ing:.3f} г) ≠ массе концентрата ({j_conc:.2f} г)")
 
+        # 🗑️ УПРАВЛЕНИЕ
         st.subheader("🗑️ Управление")
         del_cols = st.columns(min(len(st.session_state.formula_grams), 6))
         for idx, item in enumerate(st.session_state.formula_grams):
@@ -287,6 +284,7 @@ with tab_grams:
                     st.session_state.formula_grams.pop(idx)
                     st.rerun()
 
+        # 💾 СОХРАНЕНИЕ
         st.divider()
         tname = st.text_input("Название теста", placeholder="Живой Лес v4.0", key="tn")
 
@@ -295,7 +293,7 @@ with tab_grams:
                 jr = []
                 for i in st.session_state.formula_grams:
                     pc = round((i["grams"] / total_ing) * 100, 2) if total_ing > 0 else 0
-                    pf = round((i["grams"] / j_total) * 100, 3) if j_total > 0 else 0
+                    pf = round((i["grams"] / mass_final_g) * 100, 3) if mass_final_g > 0 else 0
                     real_oil = round(i["grams"] * (i["concentration"] / 100.0), 3)
                     jr.append({
                         "Название": tname,
@@ -306,7 +304,9 @@ with tab_grams:
                         "Граммы": i["grams"],
                         "Масло (г)": real_oil,
                         "% конц.": pc,
-                        "% готов.": pf
+                        "% готов.": pf,
+                        "Крепость": f"{target_strength_g}%",
+                        "Спирт (г)": alcohol_needed_g
                     })
                 st.session_state.saved_journal = pd.DataFrame(jr)
                 st.success(f"✅ '{tname}' сохранён!")
