@@ -154,43 +154,21 @@ with tab_drops:
         st.info("👆 Добавь компоненты выше")
 
 
-# === ⚖️ ВКЛАДКА 2: ГРАММЫ (ЗАМЕС С РАСЧЁТОМ СПИРТА) ===
+# === ⚖️ ВКЛАДКА 2: ГРАММЫ (ЗАМЕС С АВТОМАТИЧЕСКОЙ МАССОЙ) ===
 with tab_grams:
     st.header("⚖️ Замес в граммах")
-    st.caption("Взвесь компоненты → задай крепость → получи точную массу спирта.")
+    st.caption("Добавляй ингредиенты → масса считается сама → спирт обновляется мгновенно.")
 
     if "formula_grams" not in st.session_state:
         st.session_state.formula_grams = []
     if "saved_journal" not in st.session_state:
         st.session_state.saved_journal = None
 
-    # ✅ ЖЕЛАЕМАЯ КРЕПОСТЬ + МАССА КОНЦЕНТРАТА
-    gv1, gv2 = st.columns(2)
-    with gv1:
-        target_strength_g = st.select_slider(
-            "Желаемая крепость парфюма (%)",
-            options=[5, 10, 15, 20, 25, 30], value=15, key="tgt_str_g"
-        )
-    with gv2:
-        j_conc = st.number_input(
-            "Масса концентрата (г)", 
-            min_value=0.01, step=0.01, value=1.0, format="%.2f", key="jcg",
-            help="Сумма масс всех компонентов, которые ты уже взвесила"
-        )
-    
-    # ⚖️ РАСЧЁТ СПИРТА НА ОСНОВЕ РЕАЛЬНЫХ ГРАММОВ
-    mass_final_g = j_conc / (target_strength_g / 100.0) if target_strength_g > 0 else 0
-    alcohol_needed_g = round(mass_final_g - j_conc, 3) if mass_final_g > j_conc else 0
-    
-    m1, m2, m3 = st.columns(3)
-    with m1: st.metric("Масса готового продукта", f"{mass_final_g:.3f} г")
-    with m2: st.metric("🍶 Нужно спирта", f"{alcohol_needed_g:.3f} г", delta=f"{target_strength_g}% EdP")
-    with m3: st.metric("Масса концентрата", f"{j_conc:.2f} г")
-
-    if alcohol_needed_g <= 0 and j_conc > 0:
-        st.warning(f"⚠️ Смесь уже крепче {target_strength_g}%! Текущая крепость: ~{round((j_conc / mass_final_g) * 100, 1) if mass_final_g > 0 else 0}%")
-
-    st.divider()
+    # ✅ ЖЕЛАЕМАЯ КРЕПОСТЬ (ЕДИНСТВЕННЫЙ РУЧНОЙ ПАРАМЕТР)
+    target_strength_g = st.select_slider(
+        "Желаемая крепость парфюма (%)",
+        options=[5, 10, 15, 20, 25, 30], value=15, key="tgt_str_g"
+    )
 
     # ➕ ДОБАВЛЕНИЕ ИНГРЕДИЕНТОВ
     a1, a2, a3, a4, a5 = st.columns([2, 1, 1, 1, 1])
@@ -210,9 +188,26 @@ with tab_grams:
         })
         st.rerun()
 
-    # 📊 ТАБЛИЦА И ПРОВЕРКИ
+    # 📊 ТАБЛИЦА И РАСЧЁТЫ
     if st.session_state.formula_grams:
+        # ✅ МАССА КОНЦЕНТРАТА = СУММА ВСЕХ ИНГРЕДИЕНТОВ (АВТОМАТИЧЕСКИ!)
         total_ing = sum(i["grams"] for i in st.session_state.formula_grams)
+        
+        # ⚖️ РАСЧЁТ СПИРТА НА ОСНОВЕ ЖИВОЙ МАССЫ
+        mass_final_g = total_ing / (target_strength_g / 100.0) if target_strength_g > 0 else 0
+        alcohol_needed_g = round(mass_final_g - total_ing, 3) if mass_final_g > total_ing else 0
+        
+        m1, m2, m3 = st.columns(3)
+        with m1: st.metric("Масса концентрата", f"{total_ing:.3f} г", delta="авто-сумма")
+        with m2: st.metric("🍶 Нужно спирта", f"{alcohol_needed_g:.3f} г", delta=f"{target_strength_g}% EdP")
+        with m3: st.metric("Масса готового", f"{mass_final_g:.3f} г")
+
+        if alcohol_needed_g <= 0 and total_ing > 0:
+            current_strength = round((total_ing / mass_final_g) * 100, 1) if mass_final_g > 0 else 0
+            st.warning(f"⚠️ Смесь уже крепче {target_strength_g}%! Текущая: ~{current_strength}%")
+
+        st.divider()
+
         rows = []
         has_violation = False
         total_real_oil = 0
@@ -221,7 +216,6 @@ with tab_grams:
             pc = round((i["grams"] / total_ing) * 100, 2) if total_ing > 0 else 0
             real_oil = i["grams"] * (i["concentration"] / 100.0)
             total_real_oil += real_oil
-            # ✅ % актив. считается от МАССЫ ГОТОВОГО (концентрат + спирт)
             active_pct_in_final = round((real_oil / mass_final_g) * 100, 3) if mass_final_g > 0 else 0
 
             comp_data = COMPONENTS.get(i["comp_name"], {})
@@ -263,15 +257,12 @@ with tab_grams:
         real_oil_pct_final = round((total_real_oil / mass_final_g) * 100, 1) if mass_final_g > 0 else 0
 
         s1, s2, s3 = st.columns(3)
-        with s1: st.metric("Всего грамм (смесь)", f"{total_ing:.3f}")
-        with s2: st.metric("Реальное масло", f"{total_real_oil:.3f} г", f"{real_oil_pct_conc}% в концентрате")
-        with s3: st.metric("Итоговая концентрация", f"{real_oil_pct_final}%", f"при {target_strength_g}% крепости")
+        with s1: st.metric("Реальное масло", f"{total_real_oil:.3f} г", f"{real_oil_pct_conc}% в концентрате")
+        with s2: st.metric("Итоговая концентрация", f"{real_oil_pct_final}%", f"при {target_strength_g}% крепости")
+        with s3: st.metric("Компонентов", f"{len(st.session_state.formula_grams)} шт.")
 
         if has_violation:
             st.error("🙀🙀🙀 ВНИМАНИЕ: Превышение лимитов IFRA!")
-
-        if abs(total_ing - j_conc) > 0.001:
-            st.warning(f"⚠️ Сумма ингредиентов ({total_ing:.3f} г) ≠ массе концентрата ({j_conc:.2f} г)")
 
         # 🗑️ УПРАВЛЕНИЕ
         st.subheader("🗑️ Управление")
