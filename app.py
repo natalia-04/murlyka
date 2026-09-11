@@ -156,7 +156,7 @@ with tab_drops:
 
 # === ⚖️ ВКЛАДКА 2: ГРАММЫ (ЗАМЕС С ПРАВИЛЬНОЙ ФИЗИКОЙ v2) ===
 with tab_grams:
-    st.header("⚖️ Замес в граммах")
+    st.header("️ Замес в граммах")
     st.caption("Взвесь компоненты → задай крепость → получи точную массу спирта.")
 
     if "formula_grams" not in st.session_state:
@@ -170,7 +170,7 @@ with tab_grams:
         options=[5, 10, 15, 20, 25, 30], value=15, key="tgt_str_g"
     )
 
-    #  ДОБАВЛЕНИЕ ИНГРЕДИЕНТОВ
+    # ➕ ДОБАВЛЕНИЕ ИНГРЕДИЕНТОВ
     a1, a2, a3, a4, a5 = st.columns([2, 1, 1, 1, 1])
     with a1: j_comp = st.selectbox("Компонент", list(COMPONENTS.keys()), key="jcomp")
     with a2: j_concentration = st.selectbox("Конц. %", [100,50,30,20,10,5,2,1], index=0, key="jconc")
@@ -196,13 +196,13 @@ with tab_grams:
         # ✅ ЧИСТОЕ МАСЛО = СУММА (ГРАММЫ × КОНЦЕНТРАЦИЯ)
         total_real_oil = sum(i["grams"] * (i["concentration"] / 100.0) for i in st.session_state.formula_grams)
         
-        # ️ РАСЧЁТ СПИРТА (ЧЕРЕЗ ЧИСТОЕ МАСЛО!)
+        # ⚖️ РАСЧЁТ СПИРТА (ЧЕРЕЗ ЧИСТОЕ МАСЛО!)
         mass_final_g = total_real_oil / (target_strength_g / 100.0) if target_strength_g > 0 else 0
         alcohol_needed_g = round(mass_final_g - total_ing, 3) if mass_final_g > total_ing else 0
         
         m1, m2, m3 = st.columns(3)
         with m1: st.metric("Масса концентрата", f"{total_ing:.3f} г", delta="авто-сумма")
-        with m2: st.metric(" Нужно спирта", f"{alcohol_needed_g:.3f} г", delta=f"{target_strength_g}% EdP")
+        with m2: st.metric("🍶 Нужно спирта", f"{alcohol_needed_g:.3f} г", delta=f"{target_strength_g}% EdP")
         with m3: st.metric("Масса готового", f"{mass_final_g:.3f} г")
 
         if alcohol_needed_g <= 0 and total_ing > 0:
@@ -265,7 +265,7 @@ with tab_grams:
         with s3: st.metric("Компонентов", f"{len(st.session_state.formula_grams)} шт.")
 
         if has_violation:
-            st.error("🙀🙀🙀 ВНИМАНИЕ: Превышение лимитов IFRA!")
+            st.error("🙀🙀 ВНИМАНИЕ: Превышение лимитов IFRA!")
 
         # 🗑️ УПРАВЛЕНИЕ
         st.subheader("🗑️ Управление")
@@ -311,7 +311,7 @@ with tab_grams:
             st.divider()
             st.subheader("💾 Последний сохранённый тест")
             st.dataframe(st.session_state.saved_journal, use_container_width=True, hide_index=True)
-            if st.button(" Новый тест (очистить формулу)", use_container_width=True, key="new_test"):
+            if st.button("🆕 Новый тест (очистить формулу)", use_container_width=True, key="new_test"):
                 st.session_state.formula_grams = []
                 st.session_state.saved_journal = None
                 st.rerun()
