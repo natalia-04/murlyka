@@ -2,6 +2,9 @@ import streamlit as st
 from datetime import datetime
 import pandas as pd
 
+# ==========================================
+# 🐱 БАЗА КОМПОНЕНТОВ
+# ==========================================
 COMPONENTS = {
     "Iso E Super® (IFF)": {"ifra_limit": 20.0, "rec_dose": 20.0},
     "Ivy base 290958 (Firmenich)": {"ifra_limit": 3.0, "rec_dose": 1.5},
@@ -28,28 +31,22 @@ COMPONENTS = {
     "Bacdanol® TOCO (IFF)": {"ifra_limit": 100.0, "rec_dose": 5.0}
 }
 
+# ⚖️ ФИЗИЧЕСКИЕ КОНСТАНТЫ ДЛЯ ПЕРЕВОДА КАПЕЛЬ В ГРАММЫ
+DROP_WEIGHT_G = 0.03      # Средний вес капли парфюмерной смеси (г)
+CONCENTRATE_DENSITY = 0.95 # Относительная плотность концентрата
+
 st.set_page_config(page_title="Murlyka Lab", page_icon="😺", layout="wide")
 st.title("😺 Murlyka Lab")
 
 # ==========================================
-# 🔝 КАЛЬКУЛЯТОР БЕЗОПАСНОСТИ (КАК БЫЛО)
+# 🔝 КАЛЬКУЛЯТОР БЕЗОПАСНОСТИ (ГРАММЫ)
 # ==========================================
-st.header("🧪 Калькулятор Безопасности")
-
-unit_mode = st.radio("Единицы:", ["💧 В каплях", "⚖️ В граммах"], horizontal=True, key="calc_unit")
-
-if unit_mode == "💧 В каплях":
-    cv1, cv2 = st.columns(2)
-    with cv1: calc_conc_drops = st.number_input("Капли концентрата", min_value=1, value=30, step=1, key="ccd")
-    with cv2: calc_alc_drops = st.number_input("Капли спирта", min_value=0, value=30, step=1, key="cad")
-    calc_total_drops = calc_conc_drops + calc_alc_drops
-    st.caption(f"Всего в смеси: **{calc_total_drops} капель**")
-else:
-    cv1, cv2 = st.columns(2)
-    with cv1: calc_conc = st.slider("Концентрат (г)", 0.01, 50.0, 1.0, step=0.01, format="%.2f", key="ccg")
-    with cv2: calc_alc = st.slider("Спирт (г)", 0.0, 100.0, 1.0, step=0.01, format="%.2f", key="cag")
-    calc_total = calc_conc + calc_alc
-    st.caption(f"Готовый продукт: **{calc_total:.2f} г**")
+st.header("🧪 Калькулятор Безопасности (Граммы)")
+cv1, cv2 = st.columns(2)
+with cv1: calc_conc = st.slider("Концентрат (г)", 0.01, 50.0, 1.0, step=0.01, format="%.2f", key="ccg")
+with cv2: calc_alc = st.slider("Спирт (г)", 0.0, 100.0, 1.0, step=0.01, format="%.2f", key="cag")
+calc_total = calc_conc + calc_alc
+st.caption(f"Готовый продукт: **{calc_total:.2f} г**")
 
 cc1, cc2 = st.columns(2)
 with cc1: calc_comp = st.selectbox("Компонент", list(COMPONENTS.keys()), key="ccomp")
@@ -58,75 +55,60 @@ with cc2: calc_concentration = st.selectbox("Концентрация (%)", [100
 if st.button("Рассчитать!", type="primary", use_container_width=True, key="cbtn"):
     d = COMPONENTS[calc_comp]
     cf = calc_concentration / 100.0
-    
-    if unit_mode == "💧 В каплях":
-        # Объёмный % лимита в смеси
-        max_vol_pct = d["ifra_limit"] / cf if cf > 0 else 0
-        # Сколько капель компонента можно добавить в эту смесь
-        safe_drops = round((max_vol_pct / 100) * calc_total_drops, 1)
-        
-        st.divider()
-        st.subheader(f"📊 {calc_comp}")
-        m1, m2 = st.columns(2)
-        with m1: st.metric("Безопасно капель", f"≈ {safe_drops} кап.")
-        with m2: st.metric("Лимит IFRA", f"{d['ifra_limit']}%")
-        st.caption(f"Для смеси из {calc_conc_drops} кап. концентрата + {calc_alc_drops} кап. спирта")
-        
-    else:
-        e_ifra = 100.0 if d["ifra_limit"] == 100.0 else d["ifra_limit"] / cf
-        e_rec = d["rec_dose"] / cf
-        mx = round(calc_total * e_ifra / 100, 3)
-        rc = round(calc_total * e_rec / 100, 3)
-        st.divider()
-        st.subheader(f"📊 {calc_comp}")
-        m1, m2 = st.columns(2)
-        with m1: st.metric("Рекомендуемая доза", f"{rc} г", f"{e_rec:.2f}%")
-        with m2: st.metric("Максимум по IFRA", f"{mx} г", f"{e_ifra:.2f}%")
+    e_ifra = 100.0 if d["ifra_limit"] == 100.0 else d["ifra_limit"] / cf
+    e_rec = d["rec_dose"] / cf
+    mx = round(calc_total * e_ifra / 100, 3)
+    rc = round(calc_total * e_rec / 100, 3)
+    st.divider()
+    st.subheader(f"📊 {calc_comp}")
+    m1, m2 = st.columns(2)
+    with m1: st.metric("Рекомендуемая доза", f"{rc} г", f"{e_rec:.2f}%")
+    with m2: st.metric("Максимум по IFRA", f"{mx} г", f"{e_ifra:.2f}%")
 
 st.divider()
 
 # ==========================================
-# 👇 ЖУРНАЛ: ДВА РЕЖИМА ЧЕРЕЗ ВКЛАДКИ
+# 👇 ЖУРНАЛ: ДВА РЕЖИМА
 # ==========================================
-tab_drops, tab_grams = st.tabs(["💧 Капли (To Do)", "⚖️ Граммы (Замес)"])
+tab_drops, tab_grams = st.tabs(["💧 Капли (Черновик)", "⚖️ Граммы (Замес)"])
 
-# === ВКЛАДКА 1: КАПЛИ (TO DO) ===
+# === 💧 ВКЛАДКА 1: КАПЛИ (ЧЕРНОВИК С ФИЗИКОЙ) ===
 with tab_drops:
     st.header("📝 Черновик в каплях")
-    st.caption("Меняй капли концентрата/спирта — проценты и IFRA пересчитаются автоматически.")
+    st.caption("Задай масштаб и крепость. Безопасность считается в граммах «под капотом».")
 
     if "formula_drops" not in st.session_state:
         st.session_state.formula_drops = []
 
-    # ✅ ЖИВЫЕ ПОЛЯ: изменение мгновенно обновляет всю таблицу
-    dc1, dc2 = st.columns(2)
-    with dc1: 
+    # ✅ КОНТЕКСТ: Масштаб + Цель
+    ctx1, ctx2 = st.columns(2)
+    with ctx1:
         total_conc_drops = st.number_input(
-            "Капли концентрата (всего)", 
-            min_value=1, 
-            value=st.session_state.get("tcd_val", 30), 
-            step=1, 
-            key="tcd"
+            "Капли концентрата (всего)",
+            min_value=1, value=30, step=1, key="tcd"
         )
-        st.session_state.tcd_val = total_conc_drops
-        
-    with dc2: 
-        total_alc_drops = st.number_input(
-            "Капли спирта", 
-            min_value=0, 
-            value=st.session_state.get("tad_val", 30), 
-            step=1, 
-            key="tad"
+    with ctx2:
+        target_strength = st.select_slider(
+            "Желаемая крепость парфюма (%)",
+            options=[5, 10, 15, 20, 25, 30], value=15, key="tgt_str"
         )
-        st.session_state.tad_val = total_alc_drops
-    
-    total_mixture_drops = total_conc_drops + total_alc_drops
-    st.caption(f"Всего в смеси: **{total_mixture_drops} капель**")
 
+    # ⚖️ РАСЧЁТ МАССЫ «ПОД КАПОТОМ»
+    mass_concentrate_g = total_conc_drops * DROP_WEIGHT_G * CONCENTRATE_DENSITY
+    mass_final_product_g = mass_concentrate_g / (target_strength / 100.0) if target_strength > 0 else 0
+
+    info1, info2, info3 = st.columns(3)
+    with info1: st.metric("≈ Масса концентрата", f"{mass_concentrate_g:.3f} г")
+    with info2: st.metric("≈ Масса готового", f"{mass_final_product_g:.3f} г")
+    with info3: st.metric("≈ Нужно спирта", f"{mass_final_product_g - mass_concentrate_g:.3f} г")
+
+    st.divider()
+
+    # ➕ ДОБАВЛЕНИЕ ИНГРЕДИЕНТА
     a1, a2, a3, a4 = st.columns([2, 1, 1, 1])
     with a1: d_comp = st.selectbox("Компонент", list(COMPONENTS.keys()), key="d_comp")
     with a2: d_conc = st.selectbox("Конц. %", [100,50,30,20,10,5,2,1], index=0, key="d_conc")
-    with a3: d_drops = st.number_input("Капли компонента", min_value=0, step=1, value=1, key="d_drops")
+    with a3: d_drops = st.number_input("Капли", min_value=0, step=1, value=1, key="d_drops")
     with a4: d_add = st.button("➕ Добавить", use_container_width=True, key="d_btn")
 
     if d_add and d_drops > 0:
@@ -137,44 +119,54 @@ with tab_drops:
         })
         st.rerun()
 
-    # ✅ ДИНАМИЧЕСКИЙ ПЕРЕСЧЁТ: таблица строится заново при каждом изменении полей
+    # 🔄 ДИНАМИЧЕСКИЙ ПЕРЕСЧЁТ ВСЕЙ СМЕСИ
     if st.session_state.formula_drops:
         rows = []
         for item in st.session_state.formula_drops:
-            vol_pct_in_mix = (item["Капли"] / total_mixture_drops) * 100 if total_mixture_drops > 0 else 0
-            real_oil_pct = round(vol_pct_in_mix * (item["Конц. %"] / 100.0), 2)
-            
+            # Перевод капель компонента в граммы чистого вещества
+            mass_component_g = item["Капли"] * DROP_WEIGHT_G * CONCENTRATE_DENSITY
+            mass_pure_oil_g = mass_component_g * (item["Конц. %"] / 100.0)
+
+            # % актив. в готовом продукте (МАССОВЫЙ!)
+            active_pct_mass = round((mass_pure_oil_g / mass_final_product_g) * 100, 3) if mass_final_product_g > 0 else 0
+
             comp_data = COMPONENTS.get(item["Компонент"], {})
             ifra_limit = comp_data.get("ifra_limit", 100.0)
-            
+
             status = "✅"
-            if ifra_limit < 100.0 and real_oil_pct > ifra_limit:
+            if ifra_limit < 100.0 and active_pct_mass > ifra_limit:
                 status = "🙀🙀🙀"
 
             rows.append({
                 "Компонент": item["Компонент"],
                 "Конц. %": item["Конц. %"],
                 "Капли": item["Капли"],
-                "% актив. (объёмн.)": real_oil_pct,
-                "IFRA": status
+                "% актив. (масс.)": active_pct_mass,
+                "IFRA лимит": ifra_limit,
+                "Статус": status
             })
 
         df_drops = pd.DataFrame(rows)
-        
+
         def highlight_violation_drops(row):
-            if "🙀" in str(row["IFRA"]):
+            if "🙀" in str(row["Статус"]):
                 return ["background-color: #ffcccc"] * len(row)
             return [""] * len(row)
 
-        st.dataframe(df_drops.style.apply(highlight_violation_drops, axis=1), use_container_width=True, hide_index=True)
+        st.dataframe(
+            df_drops.style.apply(highlight_violation_drops, axis=1),
+            use_container_width=True, hide_index=True
+        )
 
+        # 📋 КОПИРОВАНИЕ
         copy_drops = df_drops.to_csv(sep='\t', index=False)
         st.components.v1.html(f"""
-            <button onclick="navigator.clipboard.writeText(`{copy_drops}`);this.innerText='✅ Скопировано!';setTimeout(()=>this.innerText='📋 Скопировать To Do',2000);"
+            <button onclick="navigator.clipboard.writeText(`{copy_drops}`);this.innerText='✅ Скопировано!';setTimeout(()=>this.innerText='📋 Скопировать черновик',2000);"
             style="width:100%;padding:8px;border:none;border-radius:6px;background:#4CAF50;color:white;font-size:14px;cursor:pointer;margin-top:10px;">
-            📋 Скопировать To Do</button>
+            📋 Скопировать черновик</button>
         """, height=45)
 
+        # 🗑️ УДАЛЕНИЕ
         del_cols = st.columns(min(len(st.session_state.formula_drops), 6))
         for idx, item in enumerate(st.session_state.formula_drops):
             col_idx = idx % 6
@@ -184,13 +176,14 @@ with tab_drops:
                     st.session_state.formula_drops.pop(idx)
                     st.rerun()
 
-        if st.button("🆕 Очистить To Do", use_container_width=True, key="clear_drops"):
+        if st.button("🆕 Очистить черновик", use_container_width=True, key="clear_drops"):
             st.session_state.formula_drops = []
             st.rerun()
     else:
         st.info("👆 Добавь компоненты выше")
 
-# === ВКЛАДКА 2: ГРАММЫ (ЗАМЕС) ===
+
+# === ⚖️ ВКЛАДКА 2: ГРАММЫ (ЗАМЕС) ===
 with tab_grams:
     st.header("⚖️ Замес в граммах")
     st.caption("Точность. Безопасность. Экспорт в Google Таблицу.")
@@ -240,7 +233,7 @@ with tab_grams:
 
             status = "✅"
             if ifra_limit < 100.0 and active_pct_in_final > ifra_limit:
-                status = "ПРЕВЫШЕНИЕ! 🙀🙀🙀"
+                status = "🙀🙀🙀 ПРЕВЫШЕНИЕ!"
                 has_violation = True
 
             rows.append({
@@ -279,7 +272,7 @@ with tab_grams:
         with s3: st.metric("Итоговая концентрация", f"{real_oil_pct_final}%", "в готовом продукте")
 
         if has_violation:
-            st.error("🙀 ВНИМАНИЕ: Превышение лимитов IFRA!")
+            st.error("🙀🙀🙀 ВНИМАНИЕ: Превышение лимитов IFRA!")
 
         if abs(total_ing - j_conc) > 0.001:
             st.warning(f"⚠️ Сумма ингредиентов ({total_ing:.3f} г) ≠ концентрату ({j_conc:.2f} г)")
@@ -294,6 +287,39 @@ with tab_grams:
                     st.session_state.formula_grams.pop(idx)
                     st.rerun()
 
-        
+        st.divider()
+        tname = st.text_input("Название теста", placeholder="Живой Лес v4.0", key="tn")
+
+        if st.button("💾 Сохранить", type="primary", use_container_width=True, key="sbtn", disabled=has_violation):
+            if tname.strip():
+                jr = []
+                for i in st.session_state.formula_grams:
+                    pc = round((i["grams"] / total_ing) * 100, 2) if total_ing > 0 else 0
+                    pf = round((i["grams"] / j_total) * 100, 3) if j_total > 0 else 0
+                    real_oil = round(i["grams"] * (i["concentration"] / 100.0), 3)
+                    jr.append({
+                        "Название": tname,
+                        "Дата": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                        "Компонент": i["label"],
+                        "Конц. %": i["concentration"],
+                        "Капли (справ.)": i["drops_ref"] if i["drops_ref"] > 0 else "—",
+                        "Граммы": i["grams"],
+                        "Масло (г)": real_oil,
+                        "% конц.": pc,
+                        "% готов.": pf
+                    })
+                st.session_state.saved_journal = pd.DataFrame(jr)
+                st.success(f"✅ '{tname}' сохранён!")
+            else:
+                st.warning("⚠️ Введите название!")
+
+        if st.session_state.saved_journal is not None:
+            st.divider()
+            st.subheader("💾 Последний сохранённый тест")
+            st.dataframe(st.session_state.saved_journal, use_container_width=True, hide_index=True)
+            if st.button("🆕 Новый тест (очистить формулу)", use_container_width=True, key="new_test"):
+                st.session_state.formula_grams = []
+                st.session_state.saved_journal = None
+                st.rerun()
     else:
         st.info("👆 Добавьте ингредиенты выше")
