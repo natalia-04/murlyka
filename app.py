@@ -43,10 +43,10 @@ st.title("😺 Murlyka Lab")
 # ==========================================
 tab_drops, tab_grams = st.tabs(["💧 Капли (Черновик)", "⚖️ Граммы (Замес)"])
 
-# === 💧 ВКЛАДКА 1: КАПЛИ (ЧЕРНОВИК С ФИЗИКОЙ) ===
+# === 💧 ВКЛАДКА 1: КАПЛИ (ЧЕРНОВИК С ЧЕСТНОЙ ПРОВЕРКОЙ ГОТОВОГО) ===
 with tab_drops:
     st.header("📝 Черновик в каплях")
-    st.caption("Задай масштаб и крепость. Безопасность считается в граммах «под капотом».")
+    st.caption("Безопасность считается ОТ МАССЫ ГОТОВОГО ПРОДУКТА. Спирт — часть расчёта.")
 
     if "formula_drops" not in st.session_state:
         st.session_state.formula_drops = []
@@ -64,14 +64,22 @@ with tab_drops:
             options=[5, 10, 15, 20, 25, 30], value=15, key="tgt_str"
         )
 
-    # ⚖️ РАСЧЁТ МАССЫ «ПОД КАПОТОМ»
+    # ⚖️ РАСЧЁТ МАССЫ КОНЦЕНТРАТА И ГОТОВОГО
     mass_concentrate_g = total_conc_drops * DROP_WEIGHT_G * CONCENTRATE_DENSITY
-    mass_final_product_g = mass_concentrate_g / (target_strength / 100.0) if target_strength > 0 else 0
+    
+    # ✅ ЧИСТОЕ МАСЛО В КОНЦЕНТРАТЕ (для расчёта массы готового)
+    # В режиме капель мы пока не знаем точный состав, поэтому используем среднюю концентрацию 30% как оценку
+    avg_concentration = 0.30 
+    estimated_pure_oil_g = mass_concentrate_g * avg_concentration
+    
+    # ⚖️ РАСЧЁТ СПИРТА И МАССЫ ГОТОВОГО (ЧЕРЕЗ ОЦЕНКУ ЧИСТОГО МАСЛА!)
+    mass_final_g = estimated_pure_oil_g / (target_strength / 100.0) if target_strength > 0 else 0
+    alcohol_ref_g = round(mass_final_g - mass_concentrate_g, 3) if mass_final_g > mass_concentrate_g else 0
 
     info1, info2, info3 = st.columns(3)
-    with info1: st.metric("≈ Масса концентрата", f"{mass_concentrate_g:.3f} г")
-    with info2: st.metric("≈ Масса готового", f"{mass_final_product_g:.3f} г")
-    with info3: st.metric("≈ Нужно спирта", f"{mass_final_product_g - mass_concentrate_g:.3f} г")
+    with info1: st.metric("≈ Масса концентрата", f"{mass_concentrate_g:.3f} г", delta="база")
+    with info2: st.metric("≈ Нужно спирта", f"{alcohol_ref_g:.3f} г", delta=f"для {target_strength}% EdP")
+    with info3: st.metric("≈ Масса готового", f"{mass_final_g:.3f} г", delta="база для IFRA")
 
     st.divider()
 
@@ -98,15 +106,15 @@ with tab_drops:
             mass_component_g = item["Капли"] * DROP_WEIGHT_G * CONCENTRATE_DENSITY
             mass_pure_oil_g = mass_component_g * (item["Конц. %"] / 100.0)
 
-            # % актив. в готовом продукте (МАССОВЫЙ!)
-            active_pct_mass = round((mass_pure_oil_g / mass_final_product_g) * 100, 3) if mass_final_product_g > 0 else 0
+            # ✅ % актив. в готовом продукте (МАССОВЫЙ! ОТ МАССЫ ГОТОВОГО!)
+            active_pct_mass = round((mass_pure_oil_g / mass_final_g) * 100, 3) if mass_final_g > 0 else 0
 
             comp_data = COMPONENTS.get(item["Компонент"], {})
             ifra_limit = comp_data.get("ifra_limit", 100.0)
 
             status = "✅"
             if ifra_limit < 100.0 and active_pct_mass > ifra_limit:
-                status = "🙀🙀🙀"
+                status = "🙀🙀"
 
             rows.append({
                 "Компонент": item["Компонент"],
