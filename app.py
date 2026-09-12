@@ -43,45 +43,19 @@ st.title("😺 Murlyka Lab")
 # ==========================================
 tab_drops, tab_grams = st.tabs(["💧 Капли (Черновик)", "⚖️ Граммы (Замес)"])
 
-# === 💧 ВКЛАДКА 1: КАПЛИ (ЧЕРНОВИК С ЧЕСТНОЙ ПРОВЕРКОЙ ГОТОВОГО) ===
+# ===  ВКЛАДКА 1: КАПЛИ (ЧЕРНОВИК С ЖИВОЙ МАССОЙ) ===
 with tab_drops:
     st.header("📝 Черновик в каплях")
-    st.caption("Безопасность считается ОТ МАССЫ ГОТОВОГО ПРОДУКТА. Спирт — часть расчёта.")
+    st.caption("Масса считается от ДОБАВЛЕННЫХ ингредиентов. Спирт и IFRA пересчитываются мгновенно.")
 
     if "formula_drops" not in st.session_state:
         st.session_state.formula_drops = []
 
-    # ✅ КОНТЕКСТ: Масштаб + Цель
-    ctx1, ctx2 = st.columns(2)
-    with ctx1:
-        total_conc_drops = st.number_input(
-            "Капли концентрата (всего)",
-            min_value=1, value=30, step=1, key="tcd"
-        )
-    with ctx2:
-        target_strength = st.select_slider(
-            "Желаемая крепость парфюма (%)",
-            options=[5, 10, 15, 20, 25, 30], value=15, key="tgt_str"
-        )
-
-    # ⚖️ РАСЧЁТ МАССЫ КОНЦЕНТРАТА И ГОТОВОГО
-    mass_concentrate_g = total_conc_drops * DROP_WEIGHT_G * CONCENTRATE_DENSITY
-    
-    # ✅ ЧИСТОЕ МАСЛО В КОНЦЕНТРАТЕ (для расчёта массы готового)
-    # В режиме капель мы пока не знаем точный состав, поэтому используем среднюю концентрацию 30% как оценку
-    avg_concentration = 0.30 
-    estimated_pure_oil_g = mass_concentrate_g * avg_concentration
-    
-    # ⚖️ РАСЧЁТ СПИРТА И МАССЫ ГОТОВОГО (ЧЕРЕЗ ОЦЕНКУ ЧИСТОГО МАСЛА!)
-    mass_final_g = estimated_pure_oil_g / (target_strength / 100.0) if target_strength > 0 else 0
-    alcohol_ref_g = round(mass_final_g - mass_concentrate_g, 3) if mass_final_g > mass_concentrate_g else 0
-
-    info1, info2, info3 = st.columns(3)
-    with info1: st.metric("≈ Масса концентрата", f"{mass_concentrate_g:.3f} г", delta="база")
-    with info2: st.metric("≈ Нужно спирта", f"{alcohol_ref_g:.3f} г", delta=f"для {target_strength}% EdP")
-    with info3: st.metric("≈ Масса готового", f"{mass_final_g:.3f} г", delta="база для IFRA")
-
-    st.divider()
+    # ✅ ТОЛЬКО ЦЕЛЕВАЯ КРЕПОСТЬ. МАССА СЧИТАЕТСЯ АВТОМАТИЧЕСКИ!
+    target_strength = st.select_slider(
+        "Желаемая крепость парфюма (%)",
+        options=[5, 10, 15, 20, 25, 30], value=15, key="tgt_str"
+    )
 
     # ➕ ДОБАВЛЕНИЕ ИНГРЕДИЕНТА
     a1, a2, a3, a4 = st.columns([2, 1, 1, 1])
@@ -100,13 +74,39 @@ with tab_drops:
 
     # 🔄 ДИНАМИЧЕСКИЙ ПЕРЕСЧЁТ ВСЕЙ СМЕСИ
     if st.session_state.formula_drops:
+        # ✅ МАССА КОНЦЕНТРАТА = СУММА ВСЕХ ДОБАВЛЕННЫХ КАПЕЛЬ × ПЛОТНОСТЬ
+        total_drops_added = sum(item["Капли"] for item in st.session_state.formula_drops)
+        mass_concentrate_g = total_drops_added * DROP_WEIGHT_G * CONCENTRATE_DENSITY
+        
+        # ✅ ЧИСТОЕ МАСЛО = СУММА (КАПЛИ × ПЛОТНОСТЬ × КОНЦЕНТРАЦИЯ)
+        total_pure_oil_g = sum(
+            item["Капли"] * DROP_WEIGHT_G * CONCENTRATE_DENSITY * (item["Конц. %"] / 100.0) 
+            for item in st.session_state.formula_drops
+        )
+        
+        # ⚖️ РАСЧЁТ СПИРТА И МАССЫ ГОТОВОГО (ЧЕРЕЗ РЕАЛЬНОЕ ЧИСТОЕ МАСЛО!)
+        mass_final_g = total_pure_oil_g / (target_strength / 100.0) if target_strength > 0 else 0
+        alcohol_ref_g = round(mass_final_g - mass_concentrate_g, 3) if mass_final_g > mass_concentrate_g else 0
+
+        info1, info2, info3 = st.columns(3)
+        with info1: st.metric("≈ Масса концентрата", f"{mass_concentrate_g:.3f} г", delta=f"{total_drops_added} капель")
+        with info2: st.metric("≈ Нужно спирта", f"{alcohol_ref_g:.3f} г", delta=f"для {target_strength}% EdP")
+        with info3: st.metric("≈ Масса готового", f"{mass_final_g:.3f} г", delta="база для IFRA")
+
+        if alcohol_ref_g <= 0 and mass_concentrate_g > 0:
+            current_strength = round((total_pure_oil_g / mass_concentrate_g) * 100, 1) if mass_concentrate_g > 0 else 0
+            st.warning(f"⚠️ Смесь уже крепче {target_strength}%! Текущая концентрация масла: ~{current_strength}%")
+
+        st.divider()
+
         rows = []
+        has_violation = False
+
         for item in st.session_state.formula_drops:
-            # Перевод капель компонента в граммы чистого вещества
             mass_component_g = item["Капли"] * DROP_WEIGHT_G * CONCENTRATE_DENSITY
             mass_pure_oil_g = mass_component_g * (item["Конц. %"] / 100.0)
 
-            # ✅ % актив. в готовом продукте (МАССОВЫЙ! ОТ МАССЫ ГОТОВОГО!)
+            # ✅ % АКТИВ. В ГОТОВОМ СЧИТАЕТСЯ ОТ МАССЫ ГОТОВОГО ПРОДУКТА
             active_pct_mass = round((mass_pure_oil_g / mass_final_g) * 100, 3) if mass_final_g > 0 else 0
 
             comp_data = COMPONENTS.get(item["Компонент"], {})
@@ -114,7 +114,8 @@ with tab_drops:
 
             status = "✅"
             if ifra_limit < 100.0 and active_pct_mass > ifra_limit:
-                status = "🙀🙀"
+                status = "🙀🙀 ПРЕВЫШЕНИЕ!"
+                has_violation = True
 
             rows.append({
                 "Компонент": item["Компонент"],
@@ -128,7 +129,7 @@ with tab_drops:
         df_drops = pd.DataFrame(rows)
 
         def highlight_violation_drops(row):
-            if "🙀" in str(row["Статус"]):
+            if "ПРЕВЫШЕНИЕ" in str(row["Статус"]):
                 return ["background-color: #ffcccc"] * len(row)
             return [""] * len(row)
 
