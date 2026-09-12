@@ -7,7 +7,7 @@ import pandas as pd
 # ==========================================
 COMPONENTS = {
     "Iso E Super® (IFF)": {"ifra_limit": 20.0, "rec_dose": 20.0},
-    "Ivy base 290958 (Firmenich)": {"ifra_limit": 3.0, "rec_dose": 1.5},
+    "Ivy base 290958 (Firmenich)": {"ifra_limit": 100.0, "rec_dose": 3.0},
     "Habanolide® 947303 (Firmenich)": {"ifra_limit": 100.0, "rec_dose": 5.0},
     "CEDARWOOD HIMALAYAN EO": {"ifra_limit": 100.0, "rec_dose": 5.0},
     "Mentha piperita EO": {"ifra_limit": 100.0, "rec_dose": 1.0},
