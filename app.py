@@ -60,7 +60,7 @@ with tab_drops:
     # ➕ ДОБАВЛЕНИЕ ИНГРЕДИЕНТА
     a1, a2, a3, a4 = st.columns([2, 1, 1, 1])
     with a1: d_comp = st.selectbox("Компонент", list(COMPONENTS.keys()), key="d_comp")
-    with a2: d_conc = st.selectbox("Конц. %", [100,50,30,20,10,5,2,1], index=0, key="d_conc")
+    with a2: d_conc = st.selectbox("Конц. %", [100,50,30,20,10,5,2,3,1], index=0, key="d_conc")
     with a3: d_drops = st.number_input("Капли", min_value=0, step=1, value=1, key="d_drops")
     with a4: d_add = st.button("➕ Добавить", use_container_width=True, key="d_btn")
 
@@ -95,7 +95,7 @@ with tab_drops:
 
         if alcohol_ref_g <= 0 and mass_concentrate_g > 0:
             current_strength = round((total_pure_oil_g / mass_concentrate_g) * 100, 1) if mass_concentrate_g > 0 else 0
-            st.warning(f"⚠️ Смесь уже крепче {target_strength}%! Текущая концентрация масла: ~{current_strength}%")
+            st.warning(f"⚠️ Смесь уже слабее {target_strength}%! Текущая концентрация масла: ~{current_strength}%")
 
         st.divider()
 
@@ -216,7 +216,7 @@ with tab_grams:
 
         if alcohol_needed_g <= 0 and total_ing > 0:
             current_strength = round((total_real_oil / total_ing) * 100, 1) if total_ing > 0 else 0
-            st.warning(f"⚠️ Смесь уже крепче {target_strength_g}%! Текущая концентрация масла: ~{current_strength}%")
+            st.warning(f"⚠️ Смесь уже слабее {target_strength_g}%! Текущая концентрация масла: ~{current_strength}%")
 
         st.divider()
 
