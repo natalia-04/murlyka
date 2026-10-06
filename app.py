@@ -38,7 +38,7 @@ st.title("😺 Murlyka Lab v5.5")
 tab_constructor, tab_grams = st.tabs(["🎨 Конструктор Аромата", "⚖️ Замес в Граммах"])
 
 # ==========================================
-#  ВКЛАДКА 1: КОНСТРУКТОР АРОМАТА (ЧЕРНОВИК)
+# 🎨 ВКЛАДКА 1: КОНСТРУКТОР АРОМАТА (ЧЕРНОВИК) - ИСПРАВЛЕНО v5.5.1
 # ==========================================
 with tab_constructor:
     st.header("🎨 Конструктор Аромата")
@@ -54,16 +54,17 @@ with tab_constructor:
     with ctx2:
         target_strength = st.select_slider("Целевая крепость (%)", options=[5, 10, 15, 20, 25, 30], value=15, key="ts_c")
 
-    # ➕ ДОБАВЛЕНИЕ СТРОКИ
+    # ➕ ДОБАВЛЕНИЕ СТРОКИ (ИСПРАВЛЕНИЕ ТИПОВ ДАННЫХ!)
     if st.button("➕ Добавить компонент", use_container_width=True, key="add_row"):
+        first_comp = list(COMPONENTS.keys())[0]
         st.session_state.constructor_rows.append({
-            "comp": list(COMPONENTS.keys())[0],
-            "conc": COMPONENTS[list(COMPONENTS.keys())[0]]["default_conc"],
+            "comp": first_comp,
+            "conc": float(COMPONENTS[first_comp]["default_conc"]),  # 🔧 ЯВНОЕ ПРЕОБРАЗОВАНИЕ В FLOAT!
             "pct_aroma": 0.0
         })
         st.rerun()
 
-    # 📝 СПИСОК КОМПОНЕНТОВ С ВВОДОМ ЦИФР
+    #  СПИСОК КОМПОНЕНТОВ С ВВОДОМ ЦИФР
     total_pct = 0.0
     rows_to_del = []
 
@@ -81,7 +82,7 @@ with tab_constructor:
             conc_val = st.number_input(
                 "Конц.%", 
                 min_value=0.01, max_value=100.0, step=0.1, 
-                value=row["conc"], format="%.1f", key=f"conc_{idx}"
+                value=float(row["conc"]), format="%.1f", key=f"conc_{idx}"  # 🔧 ТОЖЕ FLOAT!
             )
         with c3:
             pct_val = st.number_input(
@@ -91,7 +92,7 @@ with tab_constructor:
             )
             total_pct += pct_val
         with c4:
-            if st.button("❌", key=f"del_{idx}", help="Удалить строку"):
+            if st.button("", key=f"del_{idx}", help="Удалить строку"):
                 rows_to_del.append(idx)
 
         # Обновляем состояние при изменении
@@ -114,24 +115,14 @@ with tab_constructor:
     # ⚙️ РАСЧЁТ ГРАММОВ И IFRA
     is_valid = abs(total_pct - 100.0) < 0.05 and target_weight_g > 0
     
-    if is_valid and st.button(" Рассчитать граммы и проверить IFRA", type="primary", use_container_width=True, key="calc_btn"):
+    if is_valid and st.button("🧮 Рассчитать граммы и проверить IFRA", type="primary", use_container_width=True, key="calc_btn"):
         st.divider()
         
         # Математика перевода % в аромате → граммы
         results = []
-        total_pure_oil = 0.0
         
-        # Сначала считаем общее чистое масло через итерацию (т.к. % в аромате зависят от чистого масла)
-        # Упрощённая формула для черновика: 
-        # Масло_i = (Вес_конц * %_аромата_i / 100) / (Конц_i / 100) ... но это не сходится напрямую.
-        # Правильный подход: % в аромате = Масло_i / Σ(Масло_j)
-        # => Масло_i = %_аромата_i * Σ(Масло_j)
-        # => Граммы_i = (%_аромата_i * Σ(Масло_j)) / (Конц_i/100)
-        # => Σ(Граммы_i) = Вес_конц
-        # Решаем систему: Σ( (%_аромата_i * TotalOil) / Conc_i ) = Weight
+        # Решаем систему уравнений для точного расчёта чистого масла
         # TotalOil * Σ(%_aroma_i / Conc_i) = Weight
-        # TotalOil = Weight / Σ(%_aroma_i / Conc_i)
-        
         sum_ratio = sum((r["pct_aroma"] / 100.0) / (r["conc"] / 100.0) for r in st.session_state.constructor_rows)
         total_pure_oil_calc = target_weight_g / sum_ratio if sum_ratio > 0 else 0
         
@@ -153,7 +144,7 @@ with tab_constructor:
             
             status = "✅"
             if ifra_limit < 100.0 and active_pct_final > ifra_limit:
-                status = "🙀 ПРЕВЫШЕНИЕ!"
+                status = " ПРЕВЫШЕНИЕ!"
                 has_violation = True
                 
             results.append({
@@ -195,8 +186,7 @@ with tab_constructor:
         """, height=50)
 
     elif not is_valid and len(st.session_state.constructor_rows) > 0:
-        st.warning("⚠️ Для расчёта сумма % в аромате должна быть ровно 100%.")
-
+        st.warning("️ Для расчёта сумма % в аромате должна быть ровно 100%.")
 
 # ==========================================
 # ⚖️ ВКЛАДКА 2: ЗАМЕС В ГРАММАХ (ФАКТ)
