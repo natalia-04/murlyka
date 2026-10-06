@@ -38,10 +38,10 @@ st.title("😺 Murlyka Lab v5.5")
 tab_constructor, tab_grams = st.tabs(["🎨 Конструктор Аромата", "⚖️ Замес в Граммах"])
 
 # ==========================================
-# 🎨 ВКЛАДКА 1: КОНСТРУКТОР АРОМАТА (ЧЕРНОВИК) - ИСПРАВЛЕНО v5.5.1
+# 🎨 ВКЛАДКА 1: КОНСТРУКТОР АРОМАТА (v5.5.2 - УДОБНЫЙ ВВОД)
 # ==========================================
 with tab_constructor:
-    st.header("🎨 Конструктор Аромата")
+    st.header(" Конструктор Аромата")
     st.caption("Проектируй структуру → Получай граммы → Проверяй безопасность.")
 
     if "constructor_rows" not in st.session_state:
@@ -54,18 +54,18 @@ with tab_constructor:
     with ctx2:
         target_strength = st.select_slider("Целевая крепость (%)", options=[5, 10, 15, 20, 25, 30], value=15, key="ts_c")
 
-    # ➕ ДОБАВЛЕНИЕ СТРОКИ (ИСПРАВЛЕНИЕ ТИПОВ ДАННЫХ!)
+    # ➕ ДОБАВЛЕНИЕ СТРОКИ
     if st.button("➕ Добавить компонент", use_container_width=True, key="add_row"):
         first_comp = list(COMPONENTS.keys())[0]
         st.session_state.constructor_rows.append({
             "comp": first_comp,
-            "conc": float(COMPONENTS[first_comp]["default_conc"]),  # 🔧 ЯВНОЕ ПРЕОБРАЗОВАНИЕ В FLOAT!
-            "pct_aroma": 0.0
+            "conc": float(COMPONENTS[first_comp]["default_conc"]),
+            "pct_aroma": 0
         })
         st.rerun()
 
-    #  СПИСОК КОМПОНЕНТОВ С ВВОДОМ ЦИФР
-    total_pct = 0.0
+    # 📝 СПИСОК КОМПОНЕНТОВ С УДОБНЫМ ВВОДОМ
+    total_pct = 0
     rows_to_del = []
 
     for idx, row in enumerate(st.session_state.constructor_rows):
@@ -79,50 +79,51 @@ with tab_constructor:
                 key=f"comp_{idx}"
             )
         with c2:
-            conc_val = st.number_input(
+            # 🔧 ВЫПАДАЮЩИЙ СПИСОК КОНЦЕНТРАЦИЙ
+            conc_options = [100, 50, 30, 10, 3, 2, 1]
+            # Находим ближайший вариант из списка к текущему значению
+            current_conc = int(row["conc"]) if row["conc"] in conc_options else 100
+            conc_val = st.selectbox(
                 "Конц.%", 
-                min_value=0.01, max_value=100.0, step=0.1, 
-                value=float(row["conc"]), format="%.1f", key=f"conc_{idx}"  # 🔧 ТОЖЕ FLOAT!
+                options=conc_options, 
+                index=conc_options.index(current_conc),
+                key=f"conc_{idx}"
             )
         with c3:
+            # 🔧 ЦЕЛОЕ ЧИСЛО ДЛЯ % В АРОМАТЕ
             pct_val = st.number_input(
                 "% в аромате", 
-                min_value=0.0, max_value=100.0, step=0.1, 
-                value=row["pct_aroma"], format="%.1f", key=f"pct_{idx}"
+                min_value=0, max_value=100, step=1, 
+                value=int(row["pct_aroma"]), key=f"pct_{idx}"
             )
             total_pct += pct_val
         with c4:
-            if st.button("", key=f"del_{idx}", help="Удалить строку"):
+            if st.button("❌", key=f"del_{idx}", help="Удалить строку"):
                 rows_to_del.append(idx)
 
-        # Обновляем состояние при изменении
+        # Обновляем состояние
         st.session_state.constructor_rows[idx] = {
-            "comp": comp_name, "conc": conc_val, "pct_aroma": pct_val
+            "comp": comp_name, "conc": float(conc_val), "pct_aroma": pct_val
         }
 
-    # Удаление строк после рендера
+    # Удаление строк
     for idx in sorted(rows_to_del, reverse=True):
         st.session_state.constructor_rows.pop(idx)
     if rows_to_del: st.rerun()
 
-    # 🟢 ИНДИКАТОР СУММЫ
-    sum_color = "green" if abs(total_pct - 100.0) < 0.05 else "red"
-    sum_text = f"{total_pct:.1f}%"
-    sum_status = "✅ Баланс идеален!" if abs(total_pct - 100.0) < 0.05 else f"⚠️ Не хватает / лишние {abs(100.0 - total_pct):.1f}%"
+    #  ИНДИКАТОР СУММЫ
+    sum_color = "green" if total_pct == 100 else "red"
+    sum_status = "✅ Баланс идеален!" if total_pct == 100 else f"⚠️ {100 - total_pct:+d}%"
     
-    st.markdown(f"<h3 style='color:{sum_color}; text-align:center;'>Сумма % в аромате: {sum_text} — {sum_status}</h3>", unsafe_allow_html=True)
+    st.markdown(f"<h3 style='color:{sum_color}; text-align:center;'>Сумма: {total_pct}% — {sum_status}</h3>", unsafe_allow_html=True)
 
-    # ⚙️ РАСЧЁТ ГРАММОВ И IFRA
-    is_valid = abs(total_pct - 100.0) < 0.05 and target_weight_g > 0
+    # ⚙️ РАСЧЁТ
+    is_valid = (total_pct == 100) and (target_weight_g > 0)
     
-    if is_valid and st.button("🧮 Рассчитать граммы и проверить IFRA", type="primary", use_container_width=True, key="calc_btn"):
+    if is_valid and st.button("🧮 Рассчитать граммы", type="primary", use_container_width=True, key="calc_btn"):
         st.divider()
         
-        # Математика перевода % в аромате → граммы
         results = []
-        
-        # Решаем систему уравнений для точного расчёта чистого масла
-        # TotalOil * Σ(%_aroma_i / Conc_i) = Weight
         sum_ratio = sum((r["pct_aroma"] / 100.0) / (r["conc"] / 100.0) for r in st.session_state.constructor_rows)
         total_pure_oil_calc = target_weight_g / sum_ratio if sum_ratio > 0 else 0
         
@@ -132,11 +133,9 @@ with tab_constructor:
             pure_oil_g = total_pure_oil_calc * (r["pct_aroma"] / 100.0)
             comp_grams = pure_oil_g / (r["conc"] / 100.0)
             
-            # Расчёт спирта и массы готового
             mass_final_g = total_pure_oil_calc / (target_strength / 100.0) if target_strength > 0 else 0
             alcohol_g = round(mass_final_g - target_weight_g, 3) if mass_final_g > target_weight_g else 0
             
-            # % актив. в готовом для IFRA
             active_pct_final = round((pure_oil_g / mass_final_g) * 100, 3) if mass_final_g > 0 else 0
             
             comp_data = COMPONENTS.get(r["comp"], {})
@@ -144,16 +143,16 @@ with tab_constructor:
             
             status = "✅"
             if ifra_limit < 100.0 and active_pct_final > ifra_limit:
-                status = " ПРЕВЫШЕНИЕ!"
+                status = "🙀 ПРЕВЫШЕНИЕ!"
                 has_violation = True
                 
             results.append({
                 "Компонент": r["comp"],
-                "% в аромате": f"{r['pct_aroma']:.1f}%",
-                "Конц. %": r["conc"],
-                "Граммы (для весов)": round(comp_grams, 4),
+                "% в аромате": f"{r['pct_aroma']}%",
+                "Конц. %": int(r["conc"]),
+                "Граммы": round(comp_grams, 4),
                 "Чистое масло (г)": round(pure_oil_g, 4),
-                "% актив. в готовом": active_pct_final,
+                "% актив. готов.": active_pct_final,
                 "IFRA лимит": ifra_limit,
                 "Статус": status
             })
@@ -166,27 +165,25 @@ with tab_constructor:
             
         st.dataframe(df_res.style.apply(highlight_viol, axis=1), use_container_width=True, hide_index=True)
         
-        # Финальная сводка
         m1, m2, m3 = st.columns(3)
         with m1: st.metric("⚖️ Масса концентрата", f"{target_weight_g:.3f} г")
         with m2: st.metric("🍶 Нужно спирта", f"{alcohol_g:.3f} г", delta=f"{target_strength}% EdP")
         with m3: st.metric("🧪 Масса готового", f"{mass_final_g:.3f} г")
         
         if has_violation:
-            st.error("🙀🙀🙀 ВНИМАНИЕ: Превышение лимитов IFRA! Скорректируй % в аромате.")
+            st.error("🙀🙀 ВНИМАНИЕ: Превышение лимитов IFRA!")
         else:
-            st.success("✅ Все компоненты в безопасности! Можно переносить на весы.")
+            st.success("✅ Безопасно! Можно переносить на весы.")
             
-        # Копирование граммов
-        grams_copy = df_res[["Компонент", "Граммы (для весов)"]].to_csv(sep='\t', index=False)
+        grams_copy = df_res[["Компонент", "Граммы"]].to_csv(sep='\t', index=False)
         st.components.v1.html(f"""
-            <button onclick="navigator.clipboard.writeText(`{grams_copy}`);this.innerText='✅ Скопировано!';setTimeout(()=>this.innerText='📋 Скопировать граммы для весов',2000);"
+            <button onclick="navigator.clipboard.writeText(`{grams_copy}`);this.innerText='✅ Скопировано!';setTimeout(()=>this.innerText=' Скопировать граммы',2000);"
             style="width:100%;padding:10px;border:none;border-radius:6px;background:#4CAF50;color:white;font-size:16px;cursor:pointer;margin-top:10px;">
-            📋 Скопировать граммы для весов</button>
+            📋 Скопировать граммы</button>
         """, height=50)
 
     elif not is_valid and len(st.session_state.constructor_rows) > 0:
-        st.warning("️ Для расчёта сумма % в аромате должна быть ровно 100%.")
+        st.warning("️ Сумма должна быть ровно 100%")
 
 # ==========================================
 # ⚖️ ВКЛАДКА 2: ЗАМЕС В ГРАММАХ (ФАКТ)
