@@ -79,7 +79,7 @@ with tab_constructor:
             )
         with c2:
             # 🔧 ВЫПАДАЮЩИЙ СПИСОК КОНЦЕНТРАЦИЙ
-            conc_options = [100, 50, 30, 12, 10, 5, 3, 2, 1]
+            conc_options = [100, 50, 30, 20, 12, 10, 5, 3, 2, 1]
             # Находим ближайший вариант из списка к текущему значению
             current_conc = int(row["conc"]) if row["conc"] in conc_options else 100
             conc_val = st.selectbox(
@@ -200,7 +200,7 @@ with tab_grams:
 
     a1, a2, a3, a4, a5 = st.columns([2, 1, 1, 1, 1])
     with a1: j_comp = st.selectbox("Компонент", list(COMPONENTS.keys()), key="jcomp")
-    with a2: j_concentration = st.selectbox("Конц. %", [100,50,30,20,10,5,3,2,1], index=0, key="jconc")
+    with a2: j_concentration = st.selectbox("Конц. %", [100,50,30,20,12,10,5,3,2,1], index=0, key="jconc")
     with a3: j_grams = st.number_input("Граммы", min_value=0.001, step=0.001, value=0.030, format="%.3f", key="jgr")
     with a4: j_drops_ref = st.number_input("Капли (справ.)", min_value=0, step=1, value=0, key="jdr_ref")
     with a5: add_btn = st.button("➕", use_container_width=True, key="jbtn")
