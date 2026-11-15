@@ -16,9 +16,9 @@ COMPONENTS = {
     "Floralozone (IFF)": {"ifra_limit": 100.0, "rec_dose": 0.8, "default_conc": 100},
     "Patchouli EO": {"ifra_limit": 100.0, "rec_dose": 5.0, "default_conc": 100},
     "Отдушка Йогурт с курагой (Greenwax)": {"ifra_limit": 6.1, "rec_dose": 3.0, "default_conc": 30},
-    "Отдушка Кофейня (Candle Science)": {"ifra_limit": 6.6, "rec_dose": 3.3, "default_conc": 30},
-    "Отдушка Манго и кокосовое молоко (Candle Science)": {"ifra_limit": 74.99, "rec_dose": 37.0, "default_conc": 100},
-    "Отдушка Пряный мед и тонка (Candle Science)": {"ifra_limit": 17.76, "rec_dose": 8.8, "default_conc": 30},
+    "ETHYLENE BRASSYLATE (Musk T)": {"ifra_limit": 100.0, "rec_dose": 3.3, "default_conc": 100},
+    "Allyl Cyclohexyl Propionate": {"ifra_limit": 0.48, "rec_dose": 37.0, "default_conc": 1},
+    "LAVANDIN "GROSSO" EO": {"ifra_limit": 100.0, "rec_dose": 8.8, "default_conc": 5},
     "Ароматическое масло Молочный шоколад (Jean Claude)": {"ifra_limit": 35.0, "rec_dose": 17.5, "default_conc": 100},
     "Verdox HC (IFF)": {"ifra_limit": 100.0, "rec_dose": 4.0, "default_conc": 100},
     "Maltol (кристалл)": {"ifra_limit": 100.0, "rec_dose": 4.0, "default_conc": 100},
@@ -80,7 +80,7 @@ with tab_constructor:
             )
         with c2:
             # 🔧 ВЫПАДАЮЩИЙ СПИСОК КОНЦЕНТРАЦИЙ
-            conc_options = [100, 50, 30, 10, 5, 3, 2, 1]
+            conc_options = [100, 50, 30, 12, 10, 5, 3, 2, 1]
             # Находим ближайший вариант из списка к текущему значению
             current_conc = int(row["conc"]) if row["conc"] in conc_options else 100
             conc_val = st.selectbox(
